@@ -12,13 +12,10 @@ import {
   MessageSquare,
   LogOut,
   Search,
-  Database,
-  ChevronDown,
-  Smartphone,
-  Download
+  ChevronDown
 } from 'lucide-react';
 
-export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = ({ onOpenInstallModal }) => {
+export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
   const {
     currentUser,
     currentView,
@@ -28,9 +25,6 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = ({ onOpenI
     users,
     logout,
     setIsSearchOpen,
-    supabaseStatus,
-    supabaseLatencyMs,
-    syncWithSupabase,
     setUserPresence
   } = useApp();
 
@@ -173,52 +167,6 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = ({ onOpenI
               </button>
             );
           })}
-      </div>
-
-      {/* Install Mobile / PWA App CTA */}
-      {onOpenInstallModal && (
-        <div className="px-3 pb-2 flex-shrink-0">
-          <button
-            onClick={onOpenInstallModal}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-emerald-200/90 bg-emerald-50/60 hover:bg-emerald-100/70 text-[11px] text-emerald-950 font-semibold transition-all cursor-pointer shadow-soft-sm group text-left"
-            title="Install TaskFlow as a Standalone PWA / Mobile App"
-          >
-            <div className="flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Install Mobile App</span>
-            </div>
-            <Download className="w-3.5 h-3.5 text-emerald-600 group-hover:translate-y-0.5 transition-transform" />
-          </button>
-        </div>
-      )}
-
-      {/* Supabase Cloud Sync Status */}
-      <div className="px-3 pb-2 flex-shrink-0">
-        <button
-          onClick={() => syncWithSupabase()}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-slate-200/70 bg-white hover:bg-slate-50 text-[11px] text-slate-600 transition-all cursor-pointer shadow-soft-sm group text-left"
-          title={
-            supabaseStatus === 'connected'
-              ? `Connected to Supabase Cloud (${supabaseLatencyMs}ms). Click to re-sync.`
-              : 'Click to retry Supabase connection.'
-          }
-        >
-          <div className="flex items-center gap-1.5">
-            <Database
-              className={`w-3 h-3 ${
-                supabaseStatus === 'connected' ? 'text-emerald-600' : 'text-slate-400'
-              }`}
-            />
-            <span className="font-semibold text-slate-700">
-              {supabaseStatus === 'connected' ? `Cloud Synced (${supabaseLatencyMs}ms)` : 'Local Mode'}
-            </span>
-          </div>
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              supabaseStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
-            }`}
-          />
-        </button>
       </div>
 
       {/* User Footer Profile Card */}

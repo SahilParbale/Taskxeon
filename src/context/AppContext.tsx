@@ -48,7 +48,9 @@ import {
   fetchMessagesFromSupabase,
   insertMessageToSupabase,
   clearMessagesFromSupabase,
-  clearAllCloudDataFromSupabase
+  clearAllCloudDataFromSupabase,
+  purgeLegacySeedUsersFromSupabase,
+  ensureDefaultUsersInSupabase
 } from '../lib/supabase';
 
 export interface ToastMessage {
@@ -159,42 +161,37 @@ const STORAGE_KEY = 'taskflow_v4';
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Track permanently deleted employee IDs/emails to prevent ghost restorations from cloud sync
-  const [deletedUserIds, setDeletedUserIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_deleted_user_ids`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
+  // Active session deleted user tracker (in-memory only, no localStorage caching)
+  const [deletedUserIds, setDeletedUserIds] = useState<string[]>([]);
   const deletedUserIdsRef = useRef(deletedUserIds);
   useEffect(() => {
     deletedUserIdsRef.current = deletedUserIds;
-    try {
-      localStorage.setItem(`${STORAGE_KEY}_deleted_user_ids`, JSON.stringify(deletedUserIds));
-    } catch {}
   }, [deletedUserIds]);
 
-  // Load persisted state or defaults
-  const [users, setUsers] = useState<User[]>(() => {
+  // Purge any legacy cached business data from browser localStorage to enforce pure cloud DB
+  useEffect(() => {
     try {
-      const savedDeleted = localStorage.getItem(`${STORAGE_KEY}_deleted_user_ids`);
-      const deletedSet = new Set(savedDeleted ? JSON.parse(savedDeleted) : []);
-      const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
-      if (saved) {
-        const parsed: User[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const active = parsed.filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.email));
-          if (active.length > 0) return active;
-        }
-      }
-      return INITIAL_USERS.filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.email));
-    } catch {
-      return INITIAL_USERS;
+      const keysToPurge = [
+        `${STORAGE_KEY}_users`,
+        `${STORAGE_KEY}_projects`,
+        `${STORAGE_KEY}_tasks`,
+        `${STORAGE_KEY}_notifications`,
+        `${STORAGE_KEY}_activities`,
+        `${STORAGE_KEY}_messages`,
+        `${STORAGE_KEY}_deleted_user_ids`,
+        'taskflow_v1_users',
+        'taskflow_v2_users',
+        'taskflow_v3_users',
+        'taskflow_users'
+      ];
+      keysToPurge.forEach(k => localStorage.removeItem(k));
+    } catch (e) {
+      console.warn('Error purging legacy localStorage keys', e);
     }
-  });
+  }, []);
+
+  // Pure Database-Driven State: All business data originates strictly from Supabase PostgreSQL
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
 
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
     try {
@@ -205,53 +202,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_projects`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_tasks`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_notifications`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [activities, setActivities] = useState<ActivityLog[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_activities`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [devPipelines] = useState<DevPipeline[]>(INITIAL_DEV_PIPELINES);
   const [devLogs] = useState<DevLog[]>(INITIAL_DEV_LOGS);
-
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_messages`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // UI state
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -319,21 +276,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
-  // Persist to local storage
+  // Persist ONLY authentication session token and user ID across reloads (zero business data cached locally)
   useEffect(() => {
     try {
-      localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(users));
       localStorage.setItem(`${STORAGE_KEY}_currentUserId`, currentUserId);
       localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, String(isAuthenticated));
-      localStorage.setItem(`${STORAGE_KEY}_projects`, JSON.stringify(projects));
-      localStorage.setItem(`${STORAGE_KEY}_tasks`, JSON.stringify(tasks));
-      localStorage.setItem(`${STORAGE_KEY}_notifications`, JSON.stringify(notifications));
-      localStorage.setItem(`${STORAGE_KEY}_activities`, JSON.stringify(activities));
-      localStorage.setItem(`${STORAGE_KEY}_messages`, JSON.stringify(messages));
     } catch (e) {
-      console.warn('Could not persist state to localStorage', e);
+      console.warn('Could not persist auth session to localStorage', e);
     }
-  }, [users, currentUserId, isAuthenticated, projects, tasks, notifications, activities, messages]);
+  }, [currentUserId, isAuthenticated]);
 
   // Supabase Cloud State
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('connecting');
@@ -356,39 +307,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           fetchMessagesFromSupabase()
         ]);
 
-        // Sync Users & Live Presence
+        // Sync Users & Live Presence directly from Supabase (Single Source of Truth)
         if (cloudUsers && cloudUsers.length > 0) {
-          setUsers(prevUsers => {
-            const deletedSet = new Set(deletedUserIdsRef.current);
-            const activeCloudUsers = cloudUsers.filter(
-              cu => !deletedSet.has(cu.id) && !deletedSet.has(cu.email)
-            );
+          // If cloudUsers has legacy seed users, purge them from the database once
+          const hasLegacy = cloudUsers.some(u =>
+            u.email === 'alex.morgan@company.com' ||
+            u.email === 'david.chen@company.com' ||
+            u.email === 'elena.rostova@company.com' ||
+            u.email === 'marcus.vance@company.com'
+          );
+          if (hasLegacy) {
+            purgeLegacySeedUsersFromSupabase().catch(() => {});
+          }
 
-            const updated = prevUsers
-              .filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.email))
-              .map(localUser => {
-                const matchedCloud = activeCloudUsers.find(cu => cu.id === localUser.id || cu.email === localUser.email);
-                if (matchedCloud) {
-                  return {
-                    ...localUser,
-                    presence: matchedCloud.presence || localUser.presence,
-                    title: matchedCloud.title || localUser.title,
-                    department: matchedCloud.department || localUser.department,
-                    role: matchedCloud.role || localUser.role
-                  };
-                }
-                return localUser;
-              });
+          const filteredCloudUsers = cloudUsers.filter(u =>
+            u.email !== 'alex.morgan@company.com' &&
+            u.email !== 'david.chen@company.com' &&
+            u.email !== 'elena.rostova@company.com' &&
+            u.email !== 'marcus.vance@company.com'
+          );
 
-            // Append any team members added from another session (excluding deleted members)
-            activeCloudUsers.forEach(cu => {
-              if (!updated.some(u => u.id === cu.id || u.email === cu.email)) {
-                updated.push(cu);
-              }
-            });
-
-            return updated;
-          });
+          if (filteredCloudUsers.length > 0) {
+            setUsers(filteredCloudUsers);
+          }
+        } else if (cloudUsers && cloudUsers.length === 0) {
+          // Database users table is empty; populate Shreyas and Sahil into the database table
+          ensureDefaultUsersInSupabase().then(() => pullCloudChanges(true)).catch(() => {});
         }
 
         // Sync Tasks & Ring Notification for newly assigned tasks
@@ -444,13 +388,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
         }
 
-        // Sync Messages (Team Chat)
+        // Sync Messages (Team Chat) directly from Supabase Cloud (Single Source of Truth)
         if (cloudMessages !== null) {
           setMessages(prevMessages => {
             if (cloudMessages.length === 0) {
-              try {
-                localStorage.removeItem(`${STORAGE_KEY}_messages`);
-              } catch {}
               return [];
             }
             if (isSilent) {
@@ -469,14 +410,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 addToast(`💬 ${latest.senderName || 'Team Member'}`, latest.text, 'info');
               }
             }
-            // Merge so cloud messages are unified with local messages
-            const merged = [...cloudMessages];
-            prevMessages.forEach(pm => {
-              if (!merged.some(cm => cm.id === pm.id)) {
-                merged.push(pm);
-              }
-            });
-            return merged;
+            // Direct replacement from Supabase: deleted messages stay deleted across all devices
+            return cloudMessages;
           });
         }
 
@@ -554,11 +489,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         case 'MESSAGES_CLEARED': {
           setMessages([]);
-          try {
-            localStorage.removeItem(`${STORAGE_KEY}_messages`);
-          } catch {
-            // ignore
-          }
           break;
         }
         case 'NOTIFICATION_CREATED': {
@@ -868,14 +798,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Persist to deletedUserIds so background heartbeat polling never resurrects this employee
     setDeletedUserIds(prev => Array.from(new Set([...prev, userId, targetUser.email])));
 
-    // Remove from active state and local storage immediately
-    setUsers(prev => {
-      const remaining = prev.filter(u => u.id !== userId && u.email !== targetUser.email);
-      try {
-        localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(remaining));
-      } catch {}
-      return remaining;
-    });
+    // Remove from active state immediately (pure in-memory + cloud sync)
+    setUsers(prev => prev.filter(u => u.id !== userId && u.email !== targetUser.email));
 
     // Delete from Supabase cloud
     await deleteUserFromSupabase(userId, targetUser.email);
@@ -883,7 +807,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Broadcast removal across all connected tabs and devices
     realtimeSync.broadcast('USER_DELETED', { userId, email: targetUser.email });
 
-    addToast('Member Removed', `${targetUser.name} has been removed from the team roster.`, 'info');
+    // Instantly sync authoritative state with Supabase cloud
+    pullCloudChanges(true);
+
+    addToast('Member Removed', `${targetUser.name} has been removed from the team roster and database.`, 'info');
   };
 
   // Toast Helpers
@@ -1263,17 +1190,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Note: Do not play incoming chime or trigger notifications for the sender's own message
   };
 
-  // Clear all team chat messages
+  // Clear all team chat messages directly from Supabase Cloud
   const clearMessages = () => {
     setMessages([]);
-    try {
-      localStorage.removeItem(`${STORAGE_KEY}_messages`);
-    } catch (e) {
-      console.warn('Failed clearing local messages:', e);
-    }
     clearMessagesFromSupabase();
     realtimeSync.broadcast('MESSAGES_CLEARED', {});
-    addToast('Chat Cleared', 'All messages have been cleared from Team Chat.', 'info');
+    addToast('Chat Cleared', 'All messages have been cleared from Team Chat and Supabase database.', 'info');
   };
 
   // Reset data to pristine production state
@@ -1282,7 +1204,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('taskflow_')) {
+        if (key && key.startsWith('taskflow_') && !key.includes('is_authenticated') && !key.includes('currentUserId')) {
           keysToRemove.push(key);
         }
       }

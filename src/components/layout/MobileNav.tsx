@@ -11,9 +11,7 @@ import {
   FolderKanban,
   Users,
   MessageSquare,
-  X,
-  Smartphone,
-  Download
+  X
 } from 'lucide-react';
 
 export const MobileDrawer: React.FC<{
@@ -130,30 +128,6 @@ export const MobileDrawer: React.FC<{
               );
             })}
         </div>
-
-        {/* Install Mobile App Section in Drawer */}
-        {onOpenInstallModal && (
-          <div className="px-3 pb-2">
-            <button
-              onClick={() => {
-                onClose();
-                onOpenInstallModal();
-              }}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-emerald-600/15 to-teal-500/10 border border-emerald-300/80 text-emerald-950 text-xs font-bold transition-all shadow-2xs hover:bg-emerald-100/50 cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                  <Smartphone className="w-4 h-4" />
-                </div>
-                <div className="text-left">
-                  <span className="block leading-tight">Install Mobile App</span>
-                  <span className="text-[10px] text-emerald-700 font-medium">Standalone PWA Mode</span>
-                </div>
-              </div>
-              <Download className="w-4 h-4 text-emerald-700" />
-            </button>
-          </div>
-        )}
 
         {/* Drawer Footer: Status & Logout */}
         <div className="p-3 border-t border-slate-100 bg-slate-50 space-y-2">

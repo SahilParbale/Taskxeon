@@ -250,17 +250,91 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
 
 export async function deleteUserFromSupabase(userId: string, email?: string): Promise<boolean> {
   try {
-    const filter = email
-      ? `or=(id.eq.${encodeURIComponent(userId)},email.eq.${encodeURIComponent(email)})`
-      : `id=eq.${encodeURIComponent(userId)}`;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?${filter}`, {
+    // 1. Reassign any tasks assigned to this user to manager (user-1) so foreign keys/references don't block deletion
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/tasks?assignee_id=eq.${encodeURIComponent(userId)}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ assignee_id: 'user-1' })
+      });
+    } catch {
+      // ignore
+    }
+
+    // 2. Delete user by id
+    const resId = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
       method: 'DELETE',
       headers: getHeaders()
     });
-    return res.ok;
+
+    // 3. Delete by email if available to guarantee complete database cleanup
+    if (email) {
+      await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+    }
+
+    return resId.ok;
   } catch (e) {
     console.warn('[Supabase] deleteUser error:', e);
     return false;
+  }
+}
+
+// Purge any legacy demo employees from Supabase so only active roster remains
+export async function purgeLegacySeedUsersFromSupabase(): Promise<void> {
+  const legacyEmails = [
+    'alex.morgan@company.com',
+    'david.chen@company.com',
+    'elena.rostova@company.com',
+    'marcus.vance@company.com'
+  ];
+  for (const email of legacyEmails) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+    } catch {
+      // ignore
+    }
+  }
+}
+
+// Ensure Sahil and Shreyas are always in the Supabase database
+export async function ensureDefaultUsersInSupabase(): Promise<void> {
+  const defaultUsers: User[] = [
+    {
+      id: 'user-1',
+      name: 'Shreyas Jadhav',
+      email: 'shreyasjadhav@gmail.com',
+      username: 'shreyasjadhav',
+      password: 'shreyas123',
+      role: 'manager',
+      title: 'Head of Product & Operations',
+      department: 'Product Leadership',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      presence: 'online',
+      bio: 'Oversees product strategy, sprint allocation, and team deliverables.'
+    },
+    {
+      id: 'user-2',
+      name: 'Sahil Parbale',
+      email: 'sahilparbale@gmail.com',
+      username: 'sahil',
+      password: 'password123',
+      role: 'employee',
+      title: 'Lead Full-Stack Engineer',
+      department: 'Engineering',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      presence: 'online',
+      bio: 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.'
+    }
+  ];
+
+  for (const u of defaultUsers) {
+    await upsertUserToSupabase(u);
   }
 }
 

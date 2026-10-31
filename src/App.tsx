@@ -17,7 +17,7 @@ import { ToastContainer } from './components/common/Toast';
 import { InstallAppModal, MobileFloatingInstallPrompt } from './components/common/InstallAppModal';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { NotificationDropdown } from './components/common/NotificationDropdown';
-import { Layers, Search, Menu, Download } from 'lucide-react';
+import { Layers, Search, Menu } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
   const { currentView, isAuthenticated, isSearchOpen, setIsSearchOpen } = useApp();
@@ -77,14 +77,6 @@ const MainLayout: React.FC = () => {
               <span className="font-extrabold text-slate-900 text-sm tracking-tight">TaskFlow</span>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => setIsInstallModalOpen(true)}
-                className="p-2 text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
-                title="Install Mobile App"
-              >
-                <Download className="w-4 h-4" />
-                <span className="text-[11px] font-bold hidden xs:inline">App</span>
-              </button>
               <button
                 onClick={() => setIsSearchOpen(true)}
                 className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
