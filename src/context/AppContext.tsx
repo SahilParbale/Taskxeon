@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import confetti from 'canvas-confetti';
 import { dispatchSystemNotification } from '../lib/notifications';
+import { realtimeSync } from '../lib/realtimeSync';
 import {
   User,
   Project,
@@ -153,40 +154,7 @@ const STORAGE_KEY = 'taskflow_clean_v3';
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Purge any legacy demo cache from earlier development versions and clear state
-  useEffect(() => {
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (
-          key &&
-          (key.startsWith('taskflow_data_v1') ||
-           key.startsWith('taskflow_prod_v2') ||
-           key.startsWith('taskflow_dev'))
-        ) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-    } catch (e) {
-      console.warn('Could not clean legacy cache', e);
-    }
-
-    if (!localStorage.getItem('taskflow_clean_v3_executed')) {
-      // Force empty production state into memory and Supabase Cloud
-      setProjects([]);
-      setTasks([]);
-      setNotifications([]);
-      setActivities([]);
-      setMessages([]);
-      localStorage.setItem('taskflow_clean_v3_executed', 'true');
-      clearAllCloudDataFromSupabase().catch(() => {});
-    }
-  }, []);
-
   // Load persisted state or defaults
-  const [isInitialized, setIsInitialized] = useState(false);
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
@@ -229,7 +197,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [projects, setProjects] = useState<Project[]>(() => {
-    if (!localStorage.getItem('taskflow_clean_v3_executed')) return [];
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_projects`);
       return saved ? JSON.parse(saved) : [];
@@ -239,7 +206,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    if (!localStorage.getItem('taskflow_clean_v3_executed')) return [];
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_tasks`);
       return saved ? JSON.parse(saved) : [];
@@ -249,7 +215,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [notifications, setNotifications] = useState<Notification[]>(() => {
-    if (!localStorage.getItem('taskflow_clean_v3_executed')) return [];
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_notifications`);
       return saved ? JSON.parse(saved) : [];
@@ -259,7 +224,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [activities, setActivities] = useState<ActivityLog[]>(() => {
-    if (!localStorage.getItem('taskflow_clean_v3_executed')) return [];
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_activities`);
       return saved ? JSON.parse(saved) : [];
@@ -272,7 +236,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [devLogs] = useState<DevLog[]>(INITIAL_DEV_LOGS);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (!localStorage.getItem('taskflow_clean_v3_executed')) return [];
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_messages`);
       return saved ? JSON.parse(saved) : [];
@@ -340,15 +303,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('connecting');
   const [supabaseLatencyMs, setSupabaseLatencyMs] = useState(0);
 
-  // Sync / Load with Supabase on startup
-  const syncWithSupabase = async () => {
-    setSupabaseStatus('connecting');
-    const health = await checkSupabaseHealth();
-    setSupabaseStatus(health.status);
-    setSupabaseLatencyMs(health.latencyMs);
+  // Realtime Multi-Client Continuous Sync Engine
+  const pullCloudChanges = async (isSilent: boolean = false) => {
+    try {
+      const health = await checkSupabaseHealth();
+      setSupabaseStatus(health.status);
+      setSupabaseLatencyMs(health.latencyMs);
 
-    if (health.status === 'connected') {
-      try {
+      if (health.status === 'connected') {
         const [cloudUsers, cloudProjects, cloudTasks, cloudActivities, cloudNotifs] = await Promise.all([
           fetchUsersFromSupabase(),
           fetchProjectsFromSupabase(),
@@ -357,58 +319,168 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           fetchNotificationsFromSupabase()
         ]);
 
+        // Sync Users & Live Presence
         if (cloudUsers && cloudUsers.length > 0) {
-          const mappedCloudUsers = cloudUsers.map(u => {
-            if (u.id === 'user-1' || u.name === 'Sarah Jenkins' || u.email?.includes('sarah.jenkins')) {
-              const updated = {
-                ...u,
-                id: 'user-1',
-                name: 'Shreyas Jadhav',
-                email: 'shreyasjadhav@gmail.com',
-                username: 'shreyasjadhav',
-                password: 'shreyas123',
-                avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-                role: 'manager' as Role
-              };
-              upsertUserToSupabase(updated);
-              return updated;
-            }
-            return u;
+          setUsers(prevUsers => {
+            const updated = prevUsers.map(localUser => {
+              const matchedCloud = cloudUsers.find(cu => cu.id === localUser.id || cu.email === localUser.email);
+              if (matchedCloud) {
+                return {
+                  ...localUser,
+                  presence: matchedCloud.presence || localUser.presence,
+                  title: matchedCloud.title || localUser.title,
+                  department: matchedCloud.department || localUser.department,
+                  role: matchedCloud.role || localUser.role
+                };
+              }
+              return localUser;
+            });
+
+            // Append any team members added from another session
+            cloudUsers.forEach(cu => {
+              if (!updated.some(u => u.id === cu.id)) {
+                updated.push(cu);
+              }
+            });
+
+            return updated;
           });
-          setUsers(mappedCloudUsers);
-        } else {
-          INITIAL_USERS.forEach(u => upsertUserToSupabase(u));
         }
 
-        // Check if cloud data contains demo artifacts (e.g. 'proj-' or 'task-10')
-        const hasLegacyDemoProjects = cloudProjects?.some(p => p.id.startsWith('proj-') || p.key === 'PHX');
-        const hasLegacyDemoTasks = cloudTasks?.some(t => t.id.startsWith('task-10'));
-        if (hasLegacyDemoProjects || hasLegacyDemoTasks) {
-          console.info('[Supabase] Purging legacy demo data from cloud database...');
-          await clearAllCloudDataFromSupabase();
-          setProjects([]);
-          setTasks([]);
-          setActivities([]);
-          setNotifications([]);
-        } else {
-          if (cloudProjects) setProjects(cloudProjects);
-          if (cloudTasks) setTasks(cloudTasks);
-          if (cloudActivities) setActivities(cloudActivities);
-          if (cloudNotifs) setNotifications(cloudNotifs);
+        // Sync Tasks & Ring Notification for newly assigned tasks
+        if (cloudTasks) {
+          setTasks(prevTasks => {
+            if (isSilent) {
+              const prevIds = new Set(prevTasks.map(t => t.id));
+              const newlyAssigned = cloudTasks.filter(t => !prevIds.has(t.id) && t.assigneeId === currentUserId);
+              if (newlyAssigned.length > 0) {
+                newlyAssigned.forEach(nt => {
+                  dispatchSystemNotification('New Task Assigned 📋', {
+                    body: `Manager assigned you: "${nt.title}"`,
+                    data: { taskId: nt.id }
+                  });
+                  addToast('New Task Assigned 📋', `You were assigned: "${nt.title}"`, 'info');
+                });
+              }
+            }
+            return cloudTasks;
+          });
         }
 
-        addToast('Supabase Connected 🟢', `Cloud DB in sync (${health.latencyMs}ms)`, 'success');
-      } catch (err) {
-        console.warn('Error loading from Supabase:', err);
+        // Sync Projects
+        if (cloudProjects) {
+          setProjects(cloudProjects);
+        }
+
+        // Sync Activities
+        if (cloudActivities) {
+          setActivities(cloudActivities);
+        }
+
+        // Sync Notifications
+        if (cloudNotifs) {
+          setNotifications(cloudNotifs);
+        }
+
+        if (!isSilent) {
+          addToast('Supabase Connected 🟢', `Cloud DB in sync (${health.latencyMs}ms)`, 'success');
+        }
       }
-    } else if (health.status === 'needs_migration') {
-      console.info('[Supabase] Connected to project, but tables need to be created using supabase/schema.sql');
+    } catch (err) {
+      if (!isSilent) {
+        console.warn('Error syncing with Supabase:', err);
+      }
     }
   };
 
+  const syncWithSupabase = () => pullCloudChanges(false);
+
+  // 1. Instant Cross-Tab & Cross-Window Realtime Subscription (< 5ms delivery)
   useEffect(() => {
-    syncWithSupabase();
-  }, []);
+    const unsubscribe = realtimeSync.subscribe(event => {
+      switch (event.type) {
+        case 'PRESENCE_UPDATED': {
+          const { userId, presence } = event.payload;
+          setUsers(prev => prev.map(u => (u.id === userId ? { ...u, presence } : u)));
+          break;
+        }
+        case 'TASK_CREATED': {
+          const newTask: Task = event.payload;
+          setTasks(prev => {
+            if (prev.some(t => t.id === newTask.id)) return prev;
+            return [newTask, ...prev];
+          });
+          if (newTask.assigneeId === currentUserId) {
+            dispatchSystemNotification('New Task Assigned 📋', {
+              body: `Manager assigned you: "${newTask.title}"`,
+              data: { taskId: newTask.id }
+            });
+            addToast('New Task Assigned 📋', `You have been assigned: "${newTask.title}"`, 'info');
+          }
+          break;
+        }
+        case 'TASK_UPDATED': {
+          const { taskId, updates } = event.payload;
+          setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, ...updates } : t)));
+          break;
+        }
+        case 'TASK_DELETED': {
+          const { taskId } = event.payload;
+          setTasks(prev => prev.filter(t => t.id !== taskId));
+          break;
+        }
+        case 'PROJECT_CREATED': {
+          const newProj: Project = event.payload;
+          setProjects(prev => (prev.some(p => p.id === newProj.id) ? prev : [newProj, ...prev]));
+          break;
+        }
+        case 'PROJECT_UPDATED': {
+          const { projectId, updates } = event.payload;
+          setProjects(prev => prev.map(p => (p.id === projectId ? { ...p, ...updates } : p)));
+          break;
+        }
+        case 'MESSAGE_SENT': {
+          const newMsg: ChatMessage = event.payload;
+          setMessages(prev => (prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]));
+          break;
+        }
+        case 'NOTIFICATION_CREATED': {
+          const newNotif: Notification = event.payload;
+          if (newNotif.userId === currentUserId || !newNotif.userId) {
+            setNotifications(prev => (prev.some(n => n.id === newNotif.id) ? prev : [newNotif, ...prev]));
+          }
+          break;
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentUserId]);
+
+  // 2. Continuous Cloud Polling Heartbeat (every 3 seconds) & Window Focus/Visibility triggers
+  useEffect(() => {
+    pullCloudChanges(true);
+
+    const intervalId = setInterval(() => {
+      pullCloudChanges(true);
+    }, 3000);
+
+    const handleFocus = () => pullCloudChanges(true);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        pullCloudChanges(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUserId]);
 
   // Manual project progress update by any employee or manager
   const updateProjectProgress = (projectId: string, newProgress: number, newHealth?: ProjectHealth) => {
@@ -437,6 +509,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       health: newHealth || targetProj.health,
       lastUpdatedBy: currentUser.name,
       lastUpdatedAt: 'Just now'
+    });
+    realtimeSync.broadcast('PROJECT_UPDATED', {
+      projectId,
+      updates: { progress: clamped, health: newHealth || targetProj.health, lastUpdatedBy: currentUser.name, lastUpdatedAt: 'Just now' }
     });
 
     // Record activity
@@ -485,6 +561,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setProjects(prev => [newProject, ...prev]);
     upsertProjectToSupabase(newProject);
+    realtimeSync.broadcast('PROJECT_CREATED', newProject);
 
     // Record activity
     const newAct: ActivityLog = {
@@ -668,6 +745,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (user) {
       setCurrentUserId(user.id);
       addToast('User Switched', `Logged in as ${user.name}`, 'info');
+      pullCloudChanges(true);
     }
   };
 
@@ -679,6 +757,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updatedUser = { ...targetUser, presence };
     setUsers(prev => prev.map(u => (u.id === userId ? updatedUser : u)));
     upsertUserToSupabase(updatedUser);
+    realtimeSync.broadcast('PRESENCE_UPDATED', { userId, presence });
 
     // Add activity
     const presenceLabels: Record<PresenceStatus, string> = {
@@ -741,6 +820,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setTasks(prev => [newTask, ...prev]);
     upsertTaskToSupabase(newTask);
+    realtimeSync.broadcast('TASK_CREATED', newTask);
 
     // If assigned to a project, reflect changes to the respective project immediately
     const targetProj = data.projectId ? projects.find(p => p.id === data.projectId) : undefined;
@@ -839,6 +919,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prev.map(t => (t.id === taskId ? updatedTask : t))
     );
     upsertTaskToSupabase(updatedTask);
+    realtimeSync.broadcast('TASK_UPDATED', { taskId, updates: { status, completedAt: updatedTask.completedAt } });
 
     // If completing, fire celebration & notify manager / creator
     if (isCompleting) {
@@ -920,6 +1001,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updatedTask: Task = { ...oldTask, ...updates };
     setTasks(prev => prev.map(t => (t.id === taskId ? updatedTask : t)));
     upsertTaskToSupabase(updatedTask);
+    realtimeSync.broadcast('TASK_UPDATED', { taskId, updates });
 
     // If reassigned to someone new, notify them
     if (updates.assigneeId && updates.assigneeId !== oldTask.assigneeId) {
@@ -939,6 +1021,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
         setNotifications(prev => [notif, ...prev]);
         upsertNotificationToSupabase(notif);
+        realtimeSync.broadcast('NOTIFICATION_CREATED', notif);
       }
     }
 
@@ -950,6 +1033,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const task = tasks.find(t => t.id === taskId);
     setTasks(prev => prev.filter(t => t.id !== taskId));
     deleteTaskFromSupabase(taskId);
+    realtimeSync.broadcast('TASK_DELETED', { taskId });
     if (task) {
       addToast('Task Deleted', `"${task.title}" was removed`, 'info');
     }
@@ -1002,6 +1086,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       recipientId
     };
     setMessages(prev => [...prev, newMsg]);
+    realtimeSync.broadcast('MESSAGE_SENT', newMsg);
     dispatchSystemNotification(`Message from ${currentUser.name}`, {
       body: text
     });
@@ -1120,6 +1205,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       `Signed in as ${matchedUser.role === 'manager' ? 'Manager' : 'Employee'}. Workspace unlocked.`,
       'success'
     );
+
+    // Immediately trigger cloud sync for newly authenticated user
+    pullCloudChanges(true);
 
     return { success: true };
   };

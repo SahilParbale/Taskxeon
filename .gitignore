@@ -31,3 +31,8 @@ dist-ssr
 *.mjs
 *.tsbuildinfo
 .vite
+
+# Temporary scripts
+git-push.cjs
+git-result.txt
+
