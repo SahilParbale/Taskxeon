@@ -19,8 +19,13 @@ try {
   pkg.scripts.build = 'tsc && vite build';
   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
 
-  run('git add package.json git-push.cjs');
-  run('git commit -m "chore: restore standard tsc and vite build script for GitHub Actions"');
+  if (fs.existsSync('./purge-users.cjs')) {
+    fs.unlinkSync('./purge-users.cjs');
+  }
+
+  run('git status');
+  run('git add -A');
+  run('git commit -m "feat: retain only Sahil and Shreyas in workspace roster and database"');
   run('git push origin main');
   run('git status');
 } catch (e) {

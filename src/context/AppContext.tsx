@@ -157,32 +157,47 @@ const STORAGE_KEY = 'taskflow_clean_v3';
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load persisted state or defaults
+  // Load persisted state or defaults: strictly only Shreyas and Sahil
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
       if (saved) {
         const parsed: User[] = JSON.parse(saved);
-        return parsed.map(u => {
-          let user = (u.role as string) === 'developer' ? { ...u, role: 'employee' as Role } : u;
-          if (
-            user.id === 'user-1' ||
-            user.name === 'Sarah Jenkins' ||
-            user.email?.includes('sarah.jenkins')
-          ) {
+        const filtered = parsed.filter(u =>
+          u.email === 'shreyasjadhav@gmail.com' ||
+          u.email === 'sahilparbale@gmail.com' ||
+          u.id === 'user-1' ||
+          u.name.toLowerCase().includes('shreyas') ||
+          u.name.toLowerCase().includes('sahil')
+        );
+        if (filtered.length >= 2) {
+          return filtered.map(u => {
+            if (u.id === 'user-1' || u.name.toLowerCase().includes('shreyas') || u.email?.includes('shreyas')) {
+              return {
+                ...u,
+                id: 'user-1',
+                name: 'Shreyas Jadhav',
+                email: 'shreyasjadhav@gmail.com',
+                username: 'shreyasjadhav',
+                password: 'shreyas123',
+                avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+                role: 'manager' as Role
+              };
+            }
             return {
-              ...user,
-              id: 'user-1',
-              name: 'Shreyas Jadhav',
-              email: 'shreyasjadhav@gmail.com',
-              username: 'shreyasjadhav',
-              password: 'shreyas123',
-              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-              role: 'manager'
+              ...u,
+              id: 'user-2',
+              name: 'Sahil Parbale',
+              email: 'sahilparbale@gmail.com',
+              username: 'sahil',
+              password: u.password || 'password123',
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+              role: 'employee' as Role,
+              title: 'Lead Full-Stack Engineer',
+              department: 'Engineering'
             };
-          }
-          return user;
-        });
+          });
+        }
       }
       return INITIAL_USERS;
     } catch {
@@ -1246,14 +1261,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         usernameLower === rawInput ||
         nameLower === rawInput ||
         emailPrefix === rawInput ||
-        ((rawInput === 'shreyasjadhav@gmail.com' || rawInput === 'shreyasjadhav' || rawInput === 'shreyas') && u.id === 'user-1')
+        ((rawInput === 'shreyasjadhav@gmail.com' || rawInput === 'shreyasjadhav' || rawInput === 'shreyas') && u.id === 'user-1') ||
+        ((rawInput === 'sahilparbale@gmail.com' || rawInput === 'sahil' || rawInput === 'sahilparbale') && (u.id === 'user-2' || u.name.includes('Sahil')))
       );
     });
 
     if (!matchedUser) {
       return {
         success: false,
-        error: `No account found for "${usernameOrEmail}". Try using Shreyas Jadhav (shreyasjadhav@gmail.com) or Alex Morgan (alex.morgan).`
+        error: `No account found for "${usernameOrEmail}". Try using Shreyas Jadhav (shreyasjadhav@gmail.com) or Sahil Parbale (sahilparbale@gmail.com / sahil).`
       };
     }
 
@@ -1262,6 +1278,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const isPasswordValid =
       password === expectedPassword ||
       (matchedUser.id === 'user-1' && (password === 'shreyas123' || password === 'password123')) ||
+      (matchedUser.id === 'user-2' && (password === 'sahil123' || password === 'password123')) ||
       password === 'password123' ||
       password === 'taskflow123';
 
@@ -1270,7 +1287,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         success: false,
         error: matchedUser.id === 'user-1'
           ? 'Incorrect password. Password for Shreyas Jadhav is "shreyas123".'
-          : 'Incorrect password. Default demo password for all accounts is "password123".'
+          : 'Incorrect password. Password for Sahil Parbale is "password123" or "sahil123".'
       };
     }
 

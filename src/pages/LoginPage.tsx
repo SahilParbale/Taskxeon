@@ -359,11 +359,23 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div className="pt-1">
-                <p className="font-semibold text-slate-700 mb-1 text-[11px]">Employee Accounts (pwd: password123):</p>
-                <div className="space-y-0.5 text-[11px] font-mono text-slate-600">
-                  <div>• alex.morgan (Employee)</div>
-                  <div>• david.chen (Employee)</div>
-                  <div>• elena.rostova (Employee)</div>
+                <p className="font-semibold text-slate-700 mb-1 text-[11px]">Employee Account:</p>
+                <div className="p-2 bg-emerald-50/70 rounded-lg border border-emerald-200 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-900 text-xs">sahilparbale@gmail.com</div>
+                    <div className="text-[10px] text-emerald-700 font-mono">user: sahil • pwd: password123</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsernameOrEmail('sahilparbale@gmail.com');
+                      setPassword('password123');
+                      setShowForgotModal(false);
+                    }}
+                    className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
+                  >
+                    Apply
+                  </button>
                 </div>
               </div>
             </div>
