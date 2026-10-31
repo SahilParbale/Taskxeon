@@ -19,13 +19,14 @@ try {
   pkg.scripts.build = 'tsc && vite build';
   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
 
-  if (fs.existsSync('./purge-users.cjs')) {
-    fs.unlinkSync('./purge-users.cjs');
+  if (fs.existsSync('./scratch-clear-messages.cjs')) {
+    run('node ./scratch-clear-messages.cjs');
+    fs.unlinkSync('./scratch-clear-messages.cjs');
   }
 
   run('git status');
   run('git add -A');
-  run('git commit -m "feat: retain only Sahil and Shreyas in workspace roster and database"');
+  run('git commit -m "feat: clear team messages, add clear chat functionality, and sync with cloud"');
   run('git push origin main');
   run('git status');
 } catch (e) {

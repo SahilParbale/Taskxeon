@@ -47,6 +47,7 @@ import {
   upsertNotificationToSupabase,
   fetchMessagesFromSupabase,
   insertMessageToSupabase,
+  clearMessagesFromSupabase,
   clearAllCloudDataFromSupabase
 } from '../lib/supabase';
 
@@ -132,6 +133,7 @@ interface AppContextType {
   markAllNotificationsRead: () => void;
   sendNotification: (title: string, message: string, tone?: 'chime' | 'ring' | 'success' | 'message') => void;
   sendMessage: (text: string, channelId?: string, recipientId?: string) => void;
+  clearMessages: () => void;
   resetAllData: () => void;
   addToast: (title: string, description?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   removeToast: (id: string) => void;
@@ -420,8 +422,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         // Sync Messages (Team Chat)
-        if (cloudMessages && cloudMessages.length > 0) {
+        if (cloudMessages !== null) {
           setMessages(prevMessages => {
+            if (cloudMessages.length === 0) {
+              return [];
+            }
             if (isSilent) {
               const prevIds = new Set(prevMessages.map(m => m.id));
               const newIncoming = cloudMessages.filter(m => !prevIds.has(m.id) && m.senderId !== currentUserId);
@@ -514,6 +519,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               data: { channelId: newMsg.channelId }
             });
             addToast(`💬 ${newMsg.senderName || 'Team Member'}`, newMsg.text, 'info');
+          }
+          break;
+        }
+        case 'MESSAGES_CLEARED': {
+          setMessages([]);
+          try {
+            localStorage.removeItem(`${STORAGE_KEY}_messages`);
+          } catch {
+            // ignore
           }
           break;
         }
@@ -1209,6 +1223,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     soundManager.play('message');
   };
 
+  // Clear all team chat messages
+  const clearMessages = () => {
+    setMessages([]);
+    try {
+      localStorage.removeItem(`${STORAGE_KEY}_messages`);
+    } catch (e) {
+      console.warn('Failed clearing local messages:', e);
+    }
+    clearMessagesFromSupabase();
+    realtimeSync.broadcast('MESSAGES_CLEARED', {});
+    addToast('Chat Cleared', 'All messages have been cleared from Team Chat.', 'info');
+  };
+
   // Reset data to pristine production state
   const resetAllData = async () => {
     try {
@@ -1400,6 +1427,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         markAllNotificationsRead,
         sendNotification,
         sendMessage,
+        clearMessages,
         resetAllData,
         addToast,
         removeToast,

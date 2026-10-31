@@ -6,7 +6,8 @@ import {
   Search,
   CheckCheck,
   Smile,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🚀', '🎉', '🔥', '👏', '🙏', '💯', '✨', '💡', '✅', '🙌'];
@@ -16,7 +17,8 @@ export const MessagesPage: React.FC = () => {
     users,
     currentUser,
     messages,
-    sendMessage
+    sendMessage,
+    clearMessages
   } = useApp();
 
   const [inputText, setInputText] = useState('');
@@ -78,8 +80,23 @@ export const MessagesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Search Toggle */}
+        {/* Search & Actions */}
         <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm('Clear all messages from Team Chat?')) {
+                  clearMessages();
+                }
+              }}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+              title="Clear all messages from Team Chat"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Clear Chat</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsThreadSearchOpen(!isThreadSearchOpen)}
             className={`p-2 rounded-xl transition-colors cursor-pointer ${

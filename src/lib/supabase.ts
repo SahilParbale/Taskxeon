@@ -420,6 +420,19 @@ export async function insertMessageToSupabase(msg: ChatMessage): Promise<boolean
 // ==========================================
 // Clear all data from Supabase Cloud
 // ==========================================
+export async function clearMessagesFromSupabase(): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?id=neq.placeholder_none`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn('[Supabase] clearMessages error:', e);
+    return false;
+  }
+}
+
 export async function clearAllCloudDataFromSupabase(): Promise<boolean> {
   try {
     await Promise.all([
@@ -436,6 +449,10 @@ export async function clearAllCloudDataFromSupabase(): Promise<boolean> {
         headers: getHeaders()
       }),
       fetch(`${SUPABASE_URL}/rest/v1/notifications?id=neq.placeholder_none`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      }),
+      fetch(`${SUPABASE_URL}/rest/v1/messages?id=neq.placeholder_none`, {
         method: 'DELETE',
         headers: getHeaders()
       })

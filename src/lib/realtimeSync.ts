@@ -19,6 +19,7 @@ export type SyncEventType =
   | 'NOTIFICATION_READ'
   | 'ALL_NOTIFICATIONS_READ'
   | 'MESSAGE_SENT'
+  | 'MESSAGES_CLEARED'
   | 'FULL_STATE_SYNC';
 
 export interface SyncEvent {
