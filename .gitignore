@@ -12,9 +12,12 @@ node_modules
 dist
 dist-ssr
 
-# Local env files
+# Environment & secret files
+.env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
 # Editor & OS files
 .vscode/*
@@ -35,4 +38,5 @@ dist-ssr
 # Temporary scripts
 git-push.cjs
 git-result.txt
+untrack-env.cjs
 
