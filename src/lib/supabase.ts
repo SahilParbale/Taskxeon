@@ -15,8 +15,31 @@ const getHeaders = (extra: Record<string, string> = {}) => ({
   ...extra
 });
 
+export const MESSAGES_TABLE_SQL = `-- Run this in your Supabase Dashboard -> SQL Editor:
+CREATE TABLE IF NOT EXISTS public.messages (
+  id TEXT PRIMARY KEY,
+  sender_id TEXT NOT NULL,
+  sender_name TEXT,
+  sender_avatar TEXT,
+  sender_role TEXT,
+  sender_title TEXT,
+  text TEXT NOT NULL,
+  timestamp TEXT,
+  channel_id TEXT NOT NULL DEFAULT 'ch-team-chat',
+  recipient_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow anon all on messages" ON public.messages;
+CREATE POLICY "Allow anon all on messages" ON public.messages FOR ALL USING (true) WITH CHECK (true);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+`;
+
 // Check Supabase connection and verify if the tables exist
-export async function checkSupabaseHealth(): Promise<{ status: SupabaseStatus; latencyMs: number; message: string }> {
+export async function checkSupabaseHealth(): Promise<{ status: SupabaseStatus; latencyMs: number; message: string; isMessagesMissing?: boolean }> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return { status: 'disconnected', latencyMs: 0, message: 'Missing Supabase URL or Anon Key' };
   }
@@ -30,7 +53,25 @@ export async function checkSupabaseHealth(): Promise<{ status: SupabaseStatus; l
     const latencyMs = Math.round(performance.now() - start);
 
     if (res.ok) {
-      return { status: 'connected', latencyMs, message: 'Supabase Cloud Connected' };
+      let isMessagesMissing = false;
+      try {
+        const msgRes = await fetch(`${SUPABASE_URL}/rest/v1/messages?select=id&limit=1`, {
+          method: 'GET',
+          headers: getHeaders()
+        });
+        if (msgRes.status === 404) {
+          isMessagesMissing = true;
+        }
+      } catch {}
+
+      return {
+        status: 'connected',
+        latencyMs,
+        isMessagesMissing,
+        message: isMessagesMissing
+          ? 'Connected to Supabase, but "messages" table is missing'
+          : 'Supabase Cloud Connected'
+      };
     }
 
     // 404 or relation does not exist

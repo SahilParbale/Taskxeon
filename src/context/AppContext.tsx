@@ -149,6 +149,7 @@ interface AppContextType {
   // Supabase Status
   supabaseStatus: SupabaseStatus;
   supabaseLatencyMs: number;
+  isMessagesTableMissing: boolean;
 
   // Computed
   unreadCount: number;
@@ -244,9 +245,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
-  // Current active user object
+  // Current active user object with resilient ID resolution across aliases
   const currentUser = useMemo(() => {
-    return users.find(u => u.id === currentUserId) || users[0];
+    return (
+      users.find(u => u.id === currentUserId) ||
+      (currentUserId === 'user-2' ? users.find(u => u.name.includes('Sahil') || u.email.includes('sahil')) : undefined) ||
+      users[0]
+    );
   }, [users, currentUserId]);
 
   // Stable references for realtime subscription and background polling to eliminate stale closures
@@ -263,7 +268,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const isSelf = (senderId?: string, senderName?: string): boolean => {
     const activeId = currentUserIdRef.current;
     const activeUser = currentUserRef.current;
-    if (senderId && activeId && senderId === activeId) return true;
+    if (senderId && activeId && (senderId === activeId || (activeId === 'user-2' && (senderId.includes('sahil') || senderId === 'user-1793433013262')))) return true;
     if (activeUser) {
       if (senderId && (senderId === activeUser.id || senderId === activeUser.username || senderId === activeUser.email)) return true;
       if (senderName && (senderName === activeUser.name || senderName.toLowerCase() === activeUser.name.toLowerCase())) return true;
@@ -289,6 +294,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Supabase Cloud State
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('connecting');
   const [supabaseLatencyMs, setSupabaseLatencyMs] = useState(0);
+  const [isMessagesTableMissing, setIsMessagesTableMissing] = useState(false);
 
   // Realtime Multi-Client Continuous Sync Engine
   const pullCloudChanges = async (isSilent: boolean = false) => {
@@ -296,6 +302,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const health = await checkSupabaseHealth();
       setSupabaseStatus(health.status);
       setSupabaseLatencyMs(health.latencyMs);
+      if (health.isMessagesMissing !== undefined) {
+        setIsMessagesTableMissing(health.isMessagesMissing);
+      }
 
       if (health.status === 'connected') {
         const [cloudUsers, cloudProjects, cloudTasks, cloudActivities, cloudNotifs, cloudMessages] = await Promise.all([
@@ -1397,6 +1406,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         supabaseStatus,
         supabaseLatencyMs,
+        isMessagesTableMissing,
 
         unreadCount,
         userNotifications,

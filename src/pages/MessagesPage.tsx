@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { MESSAGES_TABLE_SQL } from '../lib/supabase';
 import {
   MessageSquare,
   Send,
@@ -7,8 +8,16 @@ import {
   CheckCheck,
   Smile,
   X,
-  Trash2
+  Trash2,
+  Hash,
+  User as UserIcon,
+  Copy,
+  ExternalLink,
+  AlertTriangle,
+  Menu,
+  ChevronRight
 } from 'lucide-react';
+import { User } from '../types';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🚀', '🎉', '🔥', '👏', '🙏', '💯', '✨', '💡', '✅', '🙌'];
 
@@ -18,35 +27,87 @@ export const MessagesPage: React.FC = () => {
     currentUser,
     messages,
     sendMessage,
-    clearMessages
+    clearMessages,
+    addToast,
+    isMessagesTableMissing
   } = useApp();
 
+  // Active chat target: 'team' for universal #team-chat, or a specific user ID for 1-on-1 Direct Messages
+  const [activeTab, setActiveTab] = useState<'team' | string>('team');
   const [inputText, setInputText] = useState('');
   const [inThreadSearch, setInThreadSearch] = useState('');
   const [isThreadSearchOpen, setIsThreadSearchOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isNoticeDismissed, setIsNoticeDismissed] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Online count across all members
+  // Helper to match user across ID aliases, email, or name
+  const isUserMatch = (idOrEmail?: string, targetUser?: User): boolean => {
+    if (!idOrEmail || !targetUser) return false;
+    if (idOrEmail === targetUser.id) return true;
+    if (targetUser.email && idOrEmail.toLowerCase() === targetUser.email.toLowerCase()) return true;
+    if (targetUser.username && idOrEmail.toLowerCase() === targetUser.username.toLowerCase()) return true;
+    // Resilient fallback for Sahil persona ID variations (user-2 vs user-1793433013262)
+    if (targetUser.name.includes('Sahil') && (idOrEmail === 'user-2' || idOrEmail.includes('sahil'))) return true;
+    return false;
+  };
+
+  // Active recipient user object if in Direct Message mode
+  const activeRecipient = useMemo(() => {
+    if (activeTab === 'team') return null;
+    return users.find(u => u.id === activeTab) || null;
+  }, [activeTab, users]);
+
+  // Online count across team
   const onlineCount = users.filter(u => u.presence === 'online').length;
 
-  // Filter within chat if thread search is used
-  const displayedMessages = inThreadSearch.trim()
-    ? messages.filter(m => m.text.toLowerCase().includes(inThreadSearch.toLowerCase()))
-    : messages;
+  // Other colleagues for Direct Messaging
+  const otherMembers = useMemo(() => {
+    return users.filter(u => u.id !== currentUser.id && u.email !== currentUser.email);
+  }, [users, currentUser]);
 
-  // Auto scroll to bottom STRICTLY within the chat messages container
+  // Filter messages by active conversation (Team Chat vs 1-on-1 Direct Message by ID)
+  const conversationMessages = useMemo(() => {
+    if (activeTab === 'team') {
+      return messages.filter(m => !m.recipientId || m.channelId === 'ch-team-chat');
+    }
+    if (!activeRecipient) return [];
+    return messages.filter(m => {
+      // Direct message between active user and selected recipient
+      const fromMeToRecipient = isUserMatch(m.senderId, currentUser) && isUserMatch(m.recipientId, activeRecipient);
+      const fromRecipientToMe = isUserMatch(m.senderId, activeRecipient) && (isUserMatch(m.recipientId, currentUser) || !m.recipientId);
+      return fromMeToRecipient || fromRecipientToMe;
+    });
+  }, [messages, activeTab, activeRecipient, currentUser]);
+
+  // Apply in-thread text search if active
+  const displayedMessages = useMemo(() => {
+    if (!inThreadSearch.trim()) return conversationMessages;
+    return conversationMessages.filter(m =>
+      m.text.toLowerCase().includes(inThreadSearch.toLowerCase())
+    );
+  }, [conversationMessages, inThreadSearch]);
+
+  // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [displayedMessages.length, activeTab]);
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim()) return;
 
-    sendMessage(inputText.trim(), 'ch-team-chat');
+    if (activeRecipient) {
+      // 1-on-1 Direct Message addressed specifically to active recipient's ID
+      sendMessage(inputText.trim(), undefined, activeRecipient.id);
+    } else {
+      // Universal Team Chat Channel
+      sendMessage(inputText.trim(), 'ch-team-chat');
+    }
+
     setInputText('');
     setShowEmojiPicker(false);
     inputRef.current?.focus();
@@ -57,307 +118,543 @@ export const MessagesPage: React.FC = () => {
     inputRef.current?.focus();
   };
 
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(MESSAGES_TABLE_SQL);
+    addToast('SQL Copied to Clipboard 📋', 'Paste this into Supabase SQL Editor and click Run.', 'success');
+  };
+
   return (
-    <div className="flex-1 min-h-0 w-full h-full flex flex-col overflow-hidden bg-slate-50 font-sans select-none relative">
+    <div className="flex-1 min-h-0 w-full h-full flex overflow-hidden bg-slate-50 font-sans select-none relative">
       {/* =========================================================================
-          TOP BAR: TEAM CHAT HEADER (FIXED 64px, NEVER SCROLLS)
+          LEFT SIDEBAR: CHANNELS & DIRECT MESSAGES BY ID
           ========================================================================= */}
-      <div className="h-16 px-4 sm:px-8 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0 z-10 shadow-2xs">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 shadow-soft-sm border border-emerald-100">
-            <MessageSquare className="w-5 h-5 text-emerald-700" />
+      <div
+        className={`w-72 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-20 transition-all duration-300 md:static fixed inset-y-0 left-0 shadow-lg md:shadow-none ${
+          isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        {/* Sidebar Header */}
+        <div className="h-16 px-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0 bg-slate-900 text-white">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold tracking-tight">Conversations</h2>
+              <p className="text-[11px] text-slate-400 font-medium">Chat & Direct Messages</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-slate-900 tracking-tight truncate">
-              Team Chat
-            </h2>
-            <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              <span className="font-semibold text-emerald-800">{onlineCount} Online</span>
-              <span>•</span>
-              <span>{users.length} Members</span>
-            </p>
-          </div>
+          <button
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Search & Actions */}
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
+        {/* Conversation List */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-4 chat-scrollbar">
+          {/* CHANNELS SECTION */}
+          <div>
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Channels</span>
+              <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-semibold">1</span>
+            </div>
             <button
               onClick={() => {
-                if (window.confirm('Clear all messages from Team Chat?')) {
-                  clearMessages();
-                }
+                setActiveTab('team');
+                setIsMobileSidebarOpen(false);
               }}
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
-              title="Clear all messages from Team Chat"
+              className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                activeTab === 'team'
+                  ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200/80 shadow-2xs'
+                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
+              }`}
             >
-              <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Clear Chat</span>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  activeTab === 'team' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  <Hash className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs truncate">Team Chat</p>
+                  <p className="text-[10px] text-slate-400 truncate font-normal">All team members</p>
+                </div>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
             </button>
-          )}
+          </div>
 
-          <button
-            onClick={() => setIsThreadSearchOpen(!isThreadSearchOpen)}
-            className={`p-2 rounded-xl transition-colors cursor-pointer ${
-              isThreadSearchOpen
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-            }`}
-            title="Search in messages"
-          >
-            <Search className="w-4 h-4" />
-          </button>
+          {/* DIRECT MESSAGES SECTION (BY MEMBER ID) */}
+          <div>
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Direct Messages</span>
+              <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-semibold">
+                {otherMembers.length}
+              </span>
+            </div>
+
+            <div className="space-y-1 mt-1">
+              {otherMembers.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-slate-400 italic">No other members registered.</p>
+              ) : (
+                otherMembers.map(member => {
+                  const isSelected = activeTab === member.id;
+                  const isOnline = member.presence === 'online';
+                  const isOnBreak = member.presence === 'break';
+
+                  return (
+                    <button
+                      key={member.id}
+                      onClick={() => {
+                        setActiveTab(member.id);
+                        setIsMobileSidebarOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-200/80 shadow-2xs'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={member.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                            alt={member.name}
+                            className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-100"
+                          />
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+                              isOnline ? 'bg-emerald-500' : isOnBreak ? 'bg-amber-500' : 'bg-slate-300'
+                            }`}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs truncate">{member.name}</p>
+                            {member.role === 'manager' && (
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
+                                MGR
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 truncate font-normal">
+                            {member.title || 'Team Member'}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className={`w-3.5 h-3.5 text-slate-400 flex-shrink-0 ${isSelected ? 'text-emerald-700' : 'opacity-0 hover:opacity-100'}`} />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Current User Footnote */}
+        <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center gap-2.5">
+          <div className="relative">
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.name}
+              className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30"
+            />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
+            <p className="text-[10px] text-slate-500 capitalize">{currentUser.role} • Active</p>
+          </div>
         </div>
       </div>
 
-      {/* Slide-down In-Chat Search Bar */}
-      {isThreadSearchOpen && (
-        <div className="px-4 sm:px-8 py-2 bg-white border-b border-slate-200 flex items-center gap-2 flex-shrink-0 animate-in fade-in slide-in-from-top-1 z-10">
-          <Search className="w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={inThreadSearch}
-            onChange={e => setInThreadSearch(e.target.value)}
-            placeholder="Search messages..."
-            className="flex-1 bg-transparent text-xs text-slate-900 focus:outline-none"
-            autoFocus
-          />
-          {inThreadSearch && (
-            <button
-              onClick={() => setInThreadSearch('')}
-              className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setIsThreadSearchOpen(false);
-              setInThreadSearch('');
-            }}
-            className="text-xs text-emerald-700 font-bold px-2 py-0.5 hover:underline cursor-pointer"
-          >
-            Done
-          </button>
-        </div>
+      {/* Mobile backdrop */}
+      {isMobileSidebarOpen && (
+        <div
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-10 md:hidden"
+        />
       )}
 
       {/* =========================================================================
-          MESSAGES STREAM CANVAS (ONLY THIS CONTAINER SCROLLS VERTICALLY)
+          RIGHT CHAT CANVAS
           ========================================================================= */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 sm:px-8 max-w-5xl w-full mx-auto space-y-4 chat-scrollbar">
-        {/* Centered Date Badge */}
-        {displayedMessages.length > 0 && (
-          <div className="flex justify-center sticky top-1 z-10 pointer-events-none my-2">
-            <span className="px-3 py-1 rounded-full bg-white/95 text-slate-500 shadow-2xs border border-slate-200 text-xs font-semibold uppercase tracking-wider">
-              Today
-            </span>
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-slate-50 relative">
+        {/* TOP BAR: CONVERSATION HEADER */}
+        <div className="h-16 px-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0 z-10 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile Sidebar Toggle Button */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="md:hidden p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+              title="Open Channels & Direct Messages"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {activeTab === 'team' ? (
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 shadow-soft-sm border border-emerald-100">
+                  <Hash className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
+                    Team Chat
+                    <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                      # Universal
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    <span className="font-semibold text-emerald-800">{onlineCount} Online</span>
+                    <span>•</span>
+                    <span>{users.length} Members</span>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              activeRecipient && (
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={activeRecipient.avatar}
+                      alt={activeRecipient.name}
+                      className="w-10 h-10 rounded-xl object-cover ring-2 ring-emerald-500/20 shadow-soft-sm"
+                    />
+                    <span
+                      className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ring-2 ring-white ${
+                        activeRecipient.presence === 'online'
+                          ? 'bg-emerald-500'
+                          : activeRecipient.presence === 'break'
+                          ? 'bg-amber-500'
+                          : 'bg-slate-300'
+                      }`}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-base font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
+                      {activeRecipient.name}
+                      <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full capitalize">
+                        {activeRecipient.role}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                      {activeRecipient.title || 'Team Member'} • Direct Message
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+
+          {/* Search & Actions */}
+          <div className="flex items-center gap-2">
+            {conversationMessages.length > 0 && activeTab === 'team' && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Clear all messages from Team Chat?')) {
+                    clearMessages();
+                  }
+                }}
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                title="Clear all messages from Team Chat"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Clear Chat</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsThreadSearchOpen(!isThreadSearchOpen)}
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                isThreadSearchOpen
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+              }`}
+              title="Search in conversation"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Database Missing Notice Banner */}
+        {isMessagesTableMissing && !isNoticeDismissed && (
+          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in z-10 flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <p className="truncate">
+                <span className="font-bold">Database Setup Notice:</span> The <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">public.messages</code> table is not yet created in your Supabase database.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={handleCopySql}
+                className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center gap-1.5 text-[11px] shadow-2xs transition-colors cursor-pointer"
+              >
+                <Copy className="w-3 h-3" />
+                Copy SQL Script
+              </button>
+              <a
+                href="https://supabase.com/dashboard/project/kgkggknznzumdhujsilj/sql"
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 font-semibold flex items-center gap-1 text-[11px] transition-colors"
+              >
+                Open SQL Editor
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <button
+                onClick={() => setIsNoticeDismissed(true)}
+                className="p-1 rounded text-amber-600 hover:text-amber-900"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
 
-        {displayedMessages.length === 0 ? (
-          <div className="h-3/4 flex flex-col items-center justify-center text-center p-6 text-slate-500">
-            <div className="w-12 h-12 rounded-2xl bg-white shadow-soft flex items-center justify-center text-emerald-600 mb-3 border border-slate-100">
-              <MessageSquare className="w-6 h-6" />
-            </div>
-            <p className="text-sm font-bold text-slate-800">No messages yet</p>
-            <p className="text-xs text-slate-500 max-w-xs mt-1">
-              Start the conversation! Everyone added to the team can participate here.
-            </p>
+        {/* Slide-down In-Chat Search Bar */}
+        {isThreadSearchOpen && (
+          <div className="px-4 sm:px-6 py-2 bg-white border-b border-slate-200 flex items-center gap-2 flex-shrink-0 animate-in fade-in slide-in-from-top-1 z-10">
+            <Search className="w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={inThreadSearch}
+              onChange={e => setInThreadSearch(e.target.value)}
+              placeholder="Search messages in this thread..."
+              className="flex-1 bg-transparent text-xs text-slate-900 focus:outline-none"
+              autoFocus
+            />
+            {inThreadSearch && (
+              <button
+                onClick={() => setInThreadSearch('')}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setIsThreadSearchOpen(false);
+                setInThreadSearch('');
+              }}
+              className="text-xs text-emerald-700 font-bold px-2 py-0.5 hover:underline cursor-pointer"
+            >
+              Done
+            </button>
           </div>
-        ) : (
-          displayedMessages.map(msg => {
-            const sender = users.find(u => u.id === msg.senderId);
-            const isMe = msg.senderId === currentUser.id;
-            const isAnnouncement = msg.text.startsWith('🎉 Welcome');
+        )}
 
-            // System auto-onboarding announcement card (triggered from My Team page)
-            if (isAnnouncement) {
-              return (
-                <div key={msg.id} className="flex justify-center my-3">
-                  <div className="bg-emerald-50/90 border border-emerald-200 text-emerald-950 rounded-2xl px-4 py-2.5 max-w-md shadow-2xs text-xs flex items-center gap-2.5">
-                    <span className="text-base flex-shrink-0">🎉</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-emerald-900 leading-snug">
-                        {msg.text}
-                      </p>
-                      <span className="text-[10px] text-emerald-700/80 mt-0.5 block">
-                        {msg.timestamp}
-                      </span>
+        {/* MESSAGES STREAM CANVAS */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 sm:px-8 max-w-4xl w-full mx-auto space-y-4 chat-scrollbar">
+          {displayedMessages.length > 0 && (
+            <div className="flex justify-center sticky top-1 z-10 pointer-events-none my-2">
+              <span className="px-3 py-1 rounded-full bg-white/95 text-slate-500 shadow-2xs border border-slate-200 text-xs font-semibold uppercase tracking-wider">
+                Today
+              </span>
+            </div>
+          )}
+
+          {displayedMessages.length === 0 ? (
+            <div className="h-3/4 flex flex-col items-center justify-center text-center p-6 text-slate-500">
+              <div className="w-14 h-14 rounded-2xl bg-white shadow-soft flex items-center justify-center text-emerald-600 mb-3 border border-slate-100">
+                {activeRecipient ? <UserIcon className="w-7 h-7" /> : <MessageSquare className="w-7 h-7" />}
+              </div>
+              <p className="text-sm font-bold text-slate-800">
+                {activeRecipient ? `No direct messages with ${activeRecipient.name} yet` : 'No team messages yet'}
+              </p>
+              <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
+                {activeRecipient
+                  ? `Say hello to ${activeRecipient.name} (${activeRecipient.title || 'Team Member'})! Direct messages between your IDs appear here.`
+                  : 'Start the conversation! Everyone added to the team can participate in this channel.'}
+              </p>
+            </div>
+          ) : (
+            displayedMessages.map(msg => {
+              const sender = users.find(u => isUserMatch(msg.senderId, u));
+              const isMe = isUserMatch(msg.senderId, currentUser) || (currentUser.name && msg.senderName === currentUser.name);
+              const isAnnouncement = msg.text.startsWith('🎉 Welcome');
+
+              // System auto-onboarding announcement card
+              if (isAnnouncement) {
+                return (
+                  <div key={msg.id} className="flex justify-center my-3">
+                    <div className="bg-emerald-50/90 border border-emerald-200 text-emerald-950 rounded-2xl px-4 py-2.5 max-w-md shadow-2xs text-xs flex items-center gap-2.5">
+                      <span className="text-base flex-shrink-0">🎉</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-emerald-900 leading-snug">{msg.text}</p>
+                        <span className="text-[10px] text-emerald-700/80 mt-0.5 block">{msg.timestamp}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            }
+                );
+              }
 
-            // Sender details resolution
-            const senderName = isMe
-              ? currentUser.name
-              : (msg.senderName || sender?.name || 'Team Member');
-            const senderAvatar = isMe
-              ? currentUser.avatar
-              : (msg.senderAvatar || sender?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150');
-            const senderRole = isMe
-              ? currentUser.role
-              : (msg.senderRole || sender?.role);
-            const senderTitle = isMe
-              ? currentUser.title
-              : (msg.senderTitle || sender?.title);
+              // Sender details resolution
+              const senderName = isMe ? currentUser.name : (msg.senderName || sender?.name || 'Team Member');
+              const senderAvatar = isMe
+                ? currentUser.avatar
+                : (msg.senderAvatar || sender?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150');
+              const senderRole = isMe ? currentUser.role : (msg.senderRole || sender?.role);
+              const senderTitle = isMe ? currentUser.title : (msg.senderTitle || sender?.title);
 
-            // Regular chat messages with sender name visible on all messages
-            return (
-              <div
-                key={msg.id}
-                className={`flex items-start gap-2.5 ${isMe ? 'justify-end' : 'justify-start'}`}
-              >
-                {!isMe && (
-                  <img
-                    src={senderAvatar}
-                    alt={senderName}
-                    className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-200 mt-0.5 flex-shrink-0 shadow-2xs"
-                  />
-                )}
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex items-start gap-2.5 ${isMe ? 'justify-end' : 'justify-start'}`}
+                >
+                  {!isMe && (
+                    <img
+                      src={senderAvatar}
+                      alt={senderName}
+                      className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-200 mt-0.5 flex-shrink-0 shadow-2xs"
+                    />
+                  )}
 
-                <div className={`max-w-[85%] sm:max-w-[70%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                  {/* Sender Name & Role Header */}
-                  <div className={`flex items-center gap-1.5 mb-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    {isMe ? (
-                      <>
-                        {senderRole === 'manager' ? (
-                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
-                            Manager
+                  <div className={`max-w-[85%] sm:max-w-[70%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    {/* Sender Header */}
+                    <div className={`flex items-center gap-1.5 mb-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      {isMe ? (
+                        <>
+                          {senderRole === 'manager' ? (
+                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
+                              Manager
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {senderTitle || 'Employee'}
+                            </span>
+                          )}
+                          <span className="text-xs font-bold text-slate-900 tracking-tight">
+                            {senderName} <span className="text-emerald-700 font-semibold">(You)</span>
                           </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-500 font-medium">
-                            {senderTitle || 'Employee'}
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xs font-bold text-slate-900 tracking-tight">
+                            {senderName}
                           </span>
-                        )}
-                        <span className="text-xs font-bold text-slate-900 tracking-tight">
-                          {senderName} <span className="text-emerald-700 font-semibold">(You)</span>
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xs font-bold text-slate-900 tracking-tight">
-                          {senderName}
-                        </span>
-                        {senderRole === 'manager' ? (
-                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
-                            Manager
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-500 font-medium">
-                            {senderTitle || 'Employee'}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Message Bubble */}
-                  <div
-                    className={`rounded-2xl px-4 py-3 shadow-soft-sm leading-relaxed ${
-                      isMe
-                        ? 'bg-emerald-600 text-white rounded-tr-xs'
-                        : 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs'
-                    }`}
-                  >
-                    <p
-                      className={`text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap break-words ${
-                        isMe ? 'text-white' : 'text-slate-800'
-                      }`}
-                    >
-                      {msg.text}
-                    </p>
-
-                    <div
-                      className={`flex items-center justify-end gap-1 mt-1 -mb-0.5 text-[10px] select-none ${
-                        isMe ? 'text-emerald-100/90' : 'text-slate-400'
-                      }`}
-                    >
-                      <span>{msg.timestamp}</span>
-                      {isMe && (
-                        <CheckCheck className="w-3.5 h-3.5 text-emerald-200 inline-block" />
+                          {senderRole === 'manager' ? (
+                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
+                              Manager
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {senderTitle || 'Employee'}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
-                  </div>
-                </div>
 
-                {isMe && (
-                  <img
-                    src={senderAvatar}
-                    alt={senderName}
-                    className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30 mt-0.5 flex-shrink-0 shadow-2xs"
-                  />
-                )}
-              </div>
-            );
-          })
+                    {/* Message Bubble */}
+                    <div
+                      className={`rounded-2xl px-4 py-3 shadow-soft-sm leading-relaxed ${
+                        isMe
+                          ? 'bg-emerald-600 text-white rounded-tr-xs'
+                          : 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs'
+                      }`}
+                    >
+                      <p
+                        className={`text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap break-words ${
+                          isMe ? 'text-white' : 'text-slate-800'
+                        }`}
+                      >
+                        {msg.text}
+                      </p>
+
+                      <div
+                        className={`flex items-center justify-end gap-1 mt-1 -mb-0.5 text-[10px] select-none ${
+                          isMe ? 'text-emerald-100/90' : 'text-slate-400'
+                        }`}
+                      >
+                        <span>{msg.timestamp}</span>
+                        {isMe && <CheckCheck className="w-3.5 h-3.5 text-emerald-200 inline-block" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isMe && (
+                    <img
+                      src={senderAvatar}
+                      alt={senderName}
+                      className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30 mt-0.5 flex-shrink-0 shadow-2xs"
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Quick Reaction Emojis Drawer */}
+        {showEmojiPicker && (
+          <div className="p-2.5 bg-white border-t border-slate-200 flex items-center justify-center gap-1.5 flex-wrap flex-shrink-0 animate-in fade-in slide-in-from-bottom-2 z-10">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2">
+              Quick React:
+            </span>
+            {QUICK_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => handleAddEmoji(emoji)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-base transition-transform active:scale-125 cursor-pointer"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         )}
 
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Reaction Emojis Drawer */}
-      {showEmojiPicker && (
-        <div className="p-2.5 bg-white border-t border-slate-200 flex items-center justify-center gap-1.5 flex-wrap flex-shrink-0 animate-in fade-in slide-in-from-bottom-2 z-10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2">
-            Quick React:
-          </span>
-          {QUICK_EMOJIS.map(emoji => (
+        {/* FIXED BOTTOM INPUT BAR */}
+        <div className="bg-white border-t border-slate-200 flex-shrink-0 z-10">
+          <form
+            onSubmit={handleSend}
+            className="max-w-4xl mx-auto p-3 sm:p-4 flex items-center gap-2 sm:gap-3"
+          >
             <button
-              key={emoji}
               type="button"
-              onClick={() => handleAddEmoji(emoji)}
-              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-base transition-transform active:scale-125 cursor-pointer"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                showEmojiPicker
+                  ? 'text-emerald-700 bg-emerald-50'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+              }`}
+              title="Emoji Reactions"
             >
-              {emoji}
+              <Smile className="w-5 h-5" />
             </button>
-          ))}
+
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              placeholder={
+                activeRecipient
+                  ? `Direct message to ${activeRecipient.name}...`
+                  : 'Type a message to the team...'
+              }
+              className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200/90 bg-slate-50 hover:bg-slate-100/60 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 shadow-2xs transition-all"
+            />
+
+            <button
+              type="submit"
+              disabled={!inputText.trim()}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold text-xs flex items-center gap-1.5 shadow-soft transition-all active:scale-95 cursor-pointer flex-shrink-0"
+              title="Send (Enter)"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Send</span>
+            </button>
+          </form>
         </div>
-      )}
-
-      {/* =========================================================================
-          FIXED BOTTOM INPUT BAR (NEVER SCROLLS, ALWAYS PINNED AT BOTTOM)
-          ========================================================================= */}
-      <div className="bg-white border-t border-slate-200 flex-shrink-0 z-10">
-        <form
-          onSubmit={handleSend}
-          className="max-w-5xl mx-auto p-3 sm:p-4 flex items-center gap-2 sm:gap-3"
-        >
-          <button
-            type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className={`p-2 rounded-xl transition-colors cursor-pointer ${
-              showEmojiPicker
-                ? 'text-emerald-700 bg-emerald-50'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-            }`}
-            title="Emoji Reactions"
-          >
-            <Smile className="w-5 h-5" />
-          </button>
-
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            placeholder="Type a message to the team..."
-            className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200/90 bg-slate-50 hover:bg-slate-100/60 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 shadow-2xs transition-all"
-          />
-
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold text-xs flex items-center gap-1.5 shadow-soft transition-all active:scale-95 cursor-pointer flex-shrink-0"
-            title="Send (Enter)"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Send</span>
-          </button>
-        </form>
       </div>
     </div>
   );
