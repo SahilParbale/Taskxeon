@@ -11,10 +11,16 @@ function run(cmd) {
   }
 }
 
+const fs = require('fs');
+
 try {
-  run('git status');
-  run('git add -A');
-  run('git commit -m "feat: complete end-to-end realtime sync for messages, ringing notifications, presence, and tasks"');
+  const pkgPath = './package.json';
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  pkg.scripts.build = 'tsc && vite build';
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+
+  run('git add package.json git-push.cjs');
+  run('git commit -m "chore: restore standard tsc and vite build script for GitHub Actions"');
   run('git push origin main');
   run('git status');
 } catch (e) {
