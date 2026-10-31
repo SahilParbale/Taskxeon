@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import confetti from 'canvas-confetti';
 import { dispatchSystemNotification } from '../lib/notifications';
+import { soundManager } from '../lib/notificationSound';
 import { realtimeSync } from '../lib/realtimeSync';
 import {
   User,
@@ -44,6 +45,8 @@ import {
   insertActivityToSupabase,
   fetchNotificationsFromSupabase,
   upsertNotificationToSupabase,
+  fetchMessagesFromSupabase,
+  insertMessageToSupabase,
   clearAllCloudDataFromSupabase
 } from '../lib/supabase';
 
@@ -311,12 +314,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSupabaseLatencyMs(health.latencyMs);
 
       if (health.status === 'connected') {
-        const [cloudUsers, cloudProjects, cloudTasks, cloudActivities, cloudNotifs] = await Promise.all([
+        const [cloudUsers, cloudProjects, cloudTasks, cloudActivities, cloudNotifs, cloudMessages] = await Promise.all([
           fetchUsersFromSupabase(),
           fetchProjectsFromSupabase(),
           fetchTasksFromSupabase(),
           fetchActivitiesFromSupabase(),
-          fetchNotificationsFromSupabase()
+          fetchNotificationsFromSupabase(),
+          fetchMessagesFromSupabase()
         ]);
 
         // Sync Users & Live Presence
@@ -354,6 +358,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const prevIds = new Set(prevTasks.map(t => t.id));
               const newlyAssigned = cloudTasks.filter(t => !prevIds.has(t.id) && t.assigneeId === currentUserId);
               if (newlyAssigned.length > 0) {
+                soundManager.play('ring');
                 newlyAssigned.forEach(nt => {
                   dispatchSystemNotification('New Task Assigned 📋', {
                     body: `Manager assigned you: "${nt.title}"`,
@@ -379,7 +384,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         // Sync Notifications
         if (cloudNotifs) {
-          setNotifications(cloudNotifs);
+          setNotifications(prevNotifs => {
+            if (isSilent) {
+              const prevIds = new Set(prevNotifs.map(n => n.id));
+              const newlyReceived = cloudNotifs.filter(
+                n => !prevIds.has(n.id) && (n.userId === currentUserId || !n.userId) && n.senderId !== currentUserId
+              );
+              if (newlyReceived.length > 0) {
+                soundManager.play('ring');
+                newlyReceived.forEach(nn => {
+                  dispatchSystemNotification(nn.title, {
+                    body: nn.message,
+                    data: { taskId: nn.taskId, projectId: nn.projectId }
+                  });
+                });
+              }
+            }
+            return cloudNotifs;
+          });
+        }
+
+        // Sync Messages (Team Chat)
+        if (cloudMessages && cloudMessages.length > 0) {
+          setMessages(prevMessages => {
+            if (isSilent) {
+              const prevIds = new Set(prevMessages.map(m => m.id));
+              const newIncoming = cloudMessages.filter(m => !prevIds.has(m.id) && m.senderId !== currentUserId);
+              if (newIncoming.length > 0) {
+                const latest = newIncoming[newIncoming.length - 1];
+                soundManager.play('message');
+                dispatchSystemNotification(`💬 ${latest.senderName || 'Team Chat'}`, {
+                  body: latest.text,
+                  data: { channelId: latest.channelId }
+                });
+                addToast(`💬 ${latest.senderName || 'Team Member'}`, latest.text, 'info');
+              }
+            }
+            // Merge so cloud messages are unified with local messages
+            const merged = [...cloudMessages];
+            prevMessages.forEach(pm => {
+              if (!merged.some(cm => cm.id === pm.id)) {
+                merged.push(pm);
+              }
+            });
+            return merged;
+          });
         }
 
         if (!isSilent) {
@@ -411,6 +460,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return [newTask, ...prev];
           });
           if (newTask.assigneeId === currentUserId) {
+            soundManager.play('ring');
             dispatchSystemNotification('New Task Assigned 📋', {
               body: `Manager assigned you: "${newTask.title}"`,
               data: { taskId: newTask.id }
@@ -442,13 +492,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         case 'MESSAGE_SENT': {
           const newMsg: ChatMessage = event.payload;
           setMessages(prev => (prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]));
+          if (newMsg.senderId !== currentUserId) {
+            soundManager.play('message');
+            dispatchSystemNotification(`💬 ${newMsg.senderName || 'Team Member'}`, {
+              body: newMsg.text,
+              data: { channelId: newMsg.channelId }
+            });
+            addToast(`💬 ${newMsg.senderName || 'Team Member'}`, newMsg.text, 'info');
+          }
           break;
         }
         case 'NOTIFICATION_CREATED': {
           const newNotif: Notification = event.payload;
           if (newNotif.userId === currentUserId || !newNotif.userId) {
             setNotifications(prev => (prev.some(n => n.id === newNotif.id) ? prev : [newNotif, ...prev]));
+            if (newNotif.senderId !== currentUserId) {
+              soundManager.play('ring');
+              dispatchSystemNotification(newNotif.title, {
+                body: newNotif.message,
+                data: { taskId: newNotif.taskId, projectId: newNotif.projectId }
+              });
+              addToast(newNotif.title, newNotif.message, 'info');
+            }
           }
+          break;
+        }
+        case 'NOTIFICATION_READ': {
+          const { id } = event.payload;
+          setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+          break;
+        }
+        case 'ALL_NOTIFICATIONS_READ': {
+          const { userId } = event.payload;
+          setNotifications(prev => prev.map(n => (n.userId === userId || !n.userId ? { ...n, read: true } : n)));
+          break;
+        }
+        case 'USER_CREATED': {
+          const newUser: User = event.payload;
+          setUsers(prev => (prev.some(u => u.id === newUser.id) ? prev : [...prev, newUser]));
+          break;
+        }
+        case 'USER_DELETED': {
+          const { userId } = event.payload;
+          setUsers(prev => prev.filter(u => u.id !== userId));
           break;
         }
       }
@@ -599,6 +685,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prev.map(p => (p.id === projectId ? updatedProj : p))
     );
     upsertProjectToSupabase(updatedProj);
+    realtimeSync.broadcast('PROJECT_UPDATED', {
+      projectId,
+      updates: { members: safeMembers, lastUpdatedBy: currentUser.name, lastUpdatedAt: 'Just now' }
+    });
 
     // Record activity
     const newAct: ActivityLog = {
@@ -665,6 +755,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setUsers(prev => [...prev, newUser]);
     upsertUserToSupabase(newUser);
+    realtimeSync.broadcast('USER_CREATED', newUser);
 
     // Record activity
     const newAct: ActivityLog = {
@@ -691,6 +782,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages(prev => [...prev, welcomeMsg]);
+    insertMessageToSupabase(welcomeMsg);
+    realtimeSync.broadcast('MESSAGE_SENT', welcomeMsg);
 
     addToast('Employee Onboarded 🎉', `${newUser.name} added to the team & Team Chat!`, 'success');
   };
@@ -710,6 +803,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setUsers(prev => prev.filter(u => u.id !== userId));
     deleteUserFromSupabase(userId);
+    realtimeSync.broadcast('USER_DELETED', { userId });
     addToast('Member Removed', `${targetUser.name} has been removed from the team roster.`, 'info');
   };
 
@@ -872,6 +966,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         projectId: data.projectId
       };
       setNotifications(prev => [newNotif, ...prev]);
+      upsertNotificationToSupabase(newNotif);
+      realtimeSync.broadcast('NOTIFICATION_CREATED', newNotif);
       dispatchSystemNotification('New Task Assigned 📋', {
         body: `${currentUser.name} assigned you: "${data.title}"`,
         data: { taskId: newTaskId }
@@ -953,8 +1049,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
         setNotifications(prev => [completionNotif, ...prev]);
         upsertNotificationToSupabase(completionNotif);
+        realtimeSync.broadcast('NOTIFICATION_CREATED', completionNotif);
       }
 
+      soundManager.play('success');
       dispatchSystemNotification('Task Completed! 🎉', {
         body: `"${task.title}" marked as completed by ${currentUser.name}`,
         data: { taskId: task.id }
@@ -1042,10 +1140,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Notification actions
   const markNotificationRead = (id: string) => {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    realtimeSync.broadcast('NOTIFICATION_READ', { id });
   };
 
   const markAllNotificationsRead = () => {
     setNotifications(prev => prev.map(n => (n.userId === currentUser.id ? { ...n, read: true } : n)));
+    realtimeSync.broadcast('ALL_NOTIFICATIONS_READ', { userId: currentUser.id });
     addToast('All Caught Up', 'Marked all notifications as read', 'info');
   };
 
@@ -1066,6 +1166,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: new Date().toISOString()
     };
     setNotifications(prev => [newNotif, ...prev]);
+    upsertNotificationToSupabase(newNotif);
+    realtimeSync.broadcast('NOTIFICATION_CREATED', newNotif);
+    soundManager.play(tone);
     dispatchSystemNotification(title, {
       body: message
     });
@@ -1086,10 +1189,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       recipientId
     };
     setMessages(prev => [...prev, newMsg]);
+    insertMessageToSupabase(newMsg);
     realtimeSync.broadcast('MESSAGE_SENT', newMsg);
-    dispatchSystemNotification(`Message from ${currentUser.name}`, {
-      body: text
-    });
+    soundManager.play('message');
   };
 
   // Reset data to pristine production state

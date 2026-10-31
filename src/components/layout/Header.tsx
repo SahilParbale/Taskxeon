@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { PresenceStatus } from '../../types';
 import { PresenceBadge } from '../common/PresenceBadge';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
+import { NotificationDropdown } from '../common/NotificationDropdown';
 import {
   Search,
   ChevronDown,
@@ -198,6 +199,9 @@ export const Header: React.FC<{ onMobileMenuClick: () => void }> = ({ onMobileMe
               )}
             </div>
           )}
+
+          {/* Notification Bell with Ringing Chimes & Unread Counter */}
+          <NotificationDropdown align="right" />
 
           {/* Profile Dropdown */}
           <div className="relative" ref={profileRef}>

@@ -1,4 +1,4 @@
-import { Project, Task, User, ActivityLog, Notification, PresenceStatus } from '../types';
+import { Project, Task, User, ActivityLog, Notification, ChatMessage, PresenceStatus } from '../types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://kgkggknznzumdhujsilj.supabase.co';
 const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
@@ -358,6 +358,61 @@ export async function upsertNotificationToSupabase(notif: Notification): Promise
     return res.ok;
   } catch (e) {
     console.warn('[Supabase] upsertNotification error:', e);
+    return false;
+  }
+}
+
+// ==========================================
+// Messages API
+// ==========================================
+export async function fetchMessagesFromSupabase(): Promise<ChatMessage[] | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?select=*&order=created_at.asc`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.map((row: any): ChatMessage => ({
+      id: row.id,
+      senderId: row.sender_id,
+      senderName: row.sender_name,
+      senderAvatar: row.sender_avatar,
+      senderRole: row.sender_role,
+      senderTitle: row.sender_title,
+      text: row.text,
+      timestamp: row.timestamp || new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      channelId: row.channel_id,
+      recipientId: row.recipient_id || undefined
+    }));
+  } catch (e) {
+    console.warn('[Supabase] fetchMessages error:', e);
+    return null;
+  }
+}
+
+export async function insertMessageToSupabase(msg: ChatMessage): Promise<boolean> {
+  try {
+    const payload = {
+      id: msg.id,
+      sender_id: msg.senderId,
+      sender_name: msg.senderName,
+      sender_avatar: msg.senderAvatar,
+      sender_role: msg.senderRole,
+      sender_title: msg.senderTitle,
+      text: msg.text,
+      timestamp: msg.timestamp,
+      channel_id: msg.channelId || 'ch-team-chat',
+      recipient_id: msg.recipientId || null
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+      method: 'POST',
+      headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn('[Supabase] insertMessage error:', e);
     return false;
   }
 }

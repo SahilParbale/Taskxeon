@@ -14,9 +14,9 @@ function run(cmd) {
 try {
   run('git status');
   run('git add -A');
-  run('git commit -m "feat: CI/CD workflow & realtime continuous sync across all logins and devices"');
+  run('git commit -m "feat: complete end-to-end realtime sync for messages, ringing notifications, presence, and tasks"');
   run('git push origin main');
-  run('git log -n 2 --oneline');
+  run('git status');
 } catch (e) {
   console.error(e);
 }

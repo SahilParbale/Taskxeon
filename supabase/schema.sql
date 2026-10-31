@@ -75,6 +75,21 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 6. Team Chat & Direct Messages Table
+CREATE TABLE IF NOT EXISTS public.messages (
+  id TEXT PRIMARY KEY,
+  sender_id TEXT NOT NULL,
+  sender_name TEXT,
+  sender_avatar TEXT,
+  sender_role TEXT,
+  sender_title TEXT,
+  text TEXT NOT NULL,
+  timestamp TEXT,
+  channel_id TEXT NOT NULL DEFAULT 'ch-team-chat',
+  recipient_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ============================================================================
 -- Enable Row Level Security (RLS) & Grant Policies for Anon Access
 -- ============================================================================
@@ -83,6 +98,7 @@ ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 -- Allow full read & write access for authenticated anon client
 DROP POLICY IF EXISTS "Allow anon all on users" ON public.users;
@@ -100,12 +116,16 @@ CREATE POLICY "Allow anon all on activity_logs" ON public.activity_logs FOR ALL 
 DROP POLICY IF EXISTS "Allow anon all on notifications" ON public.notifications;
 CREATE POLICY "Allow anon all on notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow anon all on messages" ON public.messages;
+CREATE POLICY "Allow anon all on messages" ON public.messages FOR ALL USING (true) WITH CHECK (true);
+
 -- Enable Supabase Realtime for live cross-tab updates
 ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.projects;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_logs;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 
 -- ============================================================================
 -- Seed Initial Demo Data (Only inserts if not already present)
