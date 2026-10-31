@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, ReactNode } from 'react';
 import confetti from 'canvas-confetti';
 import { dispatchSystemNotification } from '../lib/notifications';
 import { soundManager } from '../lib/notificationSound';
@@ -303,6 +303,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return users.find(u => u.id === currentUserId) || users[0];
   }, [users, currentUserId]);
 
+  // Stable references for realtime subscription and background polling to eliminate stale closures
+  const currentUserIdRef = useRef(currentUserId);
+  const currentUserRef = useRef(currentUser);
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+    currentUserRef.current = currentUser;
+  }, [currentUserId, currentUser]);
+
+  // Robust check to prevent any self-notifications (sound chime, OS banner, or toast)
+  // for messages and actions sent by the current user across all IDs, names, or usernames.
+  const isSelf = (senderId?: string, senderName?: string): boolean => {
+    const activeId = currentUserIdRef.current;
+    const activeUser = currentUserRef.current;
+    if (senderId && activeId && senderId === activeId) return true;
+    if (activeUser) {
+      if (senderId && (senderId === activeUser.id || senderId === activeUser.username || senderId === activeUser.email)) return true;
+      if (senderName && (senderName === activeUser.name || senderName.toLowerCase() === activeUser.name.toLowerCase())) return true;
+      if (activeUser.name && senderName) {
+        const uFirst = activeUser.name.split(' ')[0].toLowerCase();
+        const sFirst = senderName.split(' ')[0].toLowerCase();
+        if (uFirst && sFirst && uFirst === sFirst) return true;
+      }
+    }
+    return false;
+  };
+
   // Persist to local storage
   useEffect(() => {
     try {
@@ -405,7 +432,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (isSilent) {
               const prevIds = new Set(prevNotifs.map(n => n.id));
               const newlyReceived = cloudNotifs.filter(
-                n => !prevIds.has(n.id) && (n.userId === currentUserId || !n.userId) && n.senderId !== currentUserId
+                n => !prevIds.has(n.id) && (n.userId === currentUserIdRef.current || !n.userId) && !isSelf(n.senderId)
               );
               if (newlyReceived.length > 0) {
                 soundManager.play('ring');
@@ -429,7 +456,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             if (isSilent) {
               const prevIds = new Set(prevMessages.map(m => m.id));
-              const newIncoming = cloudMessages.filter(m => !prevIds.has(m.id) && m.senderId !== currentUserId);
+              // Filter out messages already seen or sent by the active user themselves
+              const newIncoming = cloudMessages.filter(
+                m => !prevIds.has(m.id) && !isSelf(m.senderId, m.senderName)
+              );
               if (newIncoming.length > 0) {
                 const latest = newIncoming[newIncoming.length - 1];
                 soundManager.play('message');
@@ -479,7 +509,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (prev.some(t => t.id === newTask.id)) return prev;
             return [newTask, ...prev];
           });
-          if (newTask.assigneeId === currentUserId) {
+          if (newTask.assigneeId === currentUserIdRef.current && !isSelf(newTask.createdById)) {
             soundManager.play('ring');
             dispatchSystemNotification('New Task Assigned 📋', {
               body: `Manager assigned you: "${newTask.title}"`,
@@ -512,7 +542,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         case 'MESSAGE_SENT': {
           const newMsg: ChatMessage = event.payload;
           setMessages(prev => (prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]));
-          if (newMsg.senderId !== currentUserId) {
+          // Strictly suppress incoming notification ring, system notification & toast if sent by self
+          if (!isSelf(newMsg.senderId, newMsg.senderName)) {
             soundManager.play('message');
             dispatchSystemNotification(`💬 ${newMsg.senderName || 'Team Member'}`, {
               body: newMsg.text,
@@ -533,9 +564,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         case 'NOTIFICATION_CREATED': {
           const newNotif: Notification = event.payload;
-          if (newNotif.userId === currentUserId || !newNotif.userId) {
+          if (newNotif.userId === currentUserIdRef.current || !newNotif.userId) {
             setNotifications(prev => (prev.some(n => n.id === newNotif.id) ? prev : [newNotif, ...prev]));
-            if (newNotif.senderId !== currentUserId) {
+            // Strictly suppress notification ring and banner for sender self
+            if (!isSelf(newNotif.senderId)) {
               soundManager.play('ring');
               dispatchSystemNotification(newNotif.title, {
                 body: newNotif.message,
@@ -997,16 +1029,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setNotifications(prev => [newNotif, ...prev]);
       upsertNotificationToSupabase(newNotif);
       realtimeSync.broadcast('NOTIFICATION_CREATED', newNotif);
-      dispatchSystemNotification('New Task Assigned 📋', {
-        body: `${currentUser.name} assigned you: "${data.title}"`,
-        data: { taskId: newTaskId }
-      });
-    } else {
-      // Self assignment or local trigger
-      dispatchSystemNotification('Task Created 📋', {
-        body: `"${data.title}" created successfully`,
-        data: { taskId: newTaskId }
-      });
     }
 
     // Add activity
@@ -1220,7 +1242,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setMessages(prev => [...prev, newMsg]);
     insertMessageToSupabase(newMsg);
     realtimeSync.broadcast('MESSAGE_SENT', newMsg);
-    soundManager.play('message');
+    // Note: Do not play incoming chime or trigger notifications for the sender's own message
   };
 
   // Clear all team chat messages
