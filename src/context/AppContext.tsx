@@ -154,54 +154,43 @@ interface AppContextType {
   assignedTasks: Task[];
 }
 
-const STORAGE_KEY = 'taskflow_clean_v3';
+const STORAGE_KEY = 'taskflow_v4';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load persisted state or defaults: strictly only Shreyas and Sahil
+  // Track permanently deleted employee IDs/emails to prevent ghost restorations from cloud sync
+  const [deletedUserIds, setDeletedUserIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY}_deleted_user_ids`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const deletedUserIdsRef = useRef(deletedUserIds);
+  useEffect(() => {
+    deletedUserIdsRef.current = deletedUserIds;
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_deleted_user_ids`, JSON.stringify(deletedUserIds));
+    } catch {}
+  }, [deletedUserIds]);
+
+  // Load persisted state or defaults
   const [users, setUsers] = useState<User[]>(() => {
     try {
+      const savedDeleted = localStorage.getItem(`${STORAGE_KEY}_deleted_user_ids`);
+      const deletedSet = new Set(savedDeleted ? JSON.parse(savedDeleted) : []);
       const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
       if (saved) {
         const parsed: User[] = JSON.parse(saved);
-        const filtered = parsed.filter(u =>
-          u.email === 'shreyasjadhav@gmail.com' ||
-          u.email === 'sahilparbale@gmail.com' ||
-          u.id === 'user-1' ||
-          u.name.toLowerCase().includes('shreyas') ||
-          u.name.toLowerCase().includes('sahil')
-        );
-        if (filtered.length >= 2) {
-          return filtered.map(u => {
-            if (u.id === 'user-1' || u.name.toLowerCase().includes('shreyas') || u.email?.includes('shreyas')) {
-              return {
-                ...u,
-                id: 'user-1',
-                name: 'Shreyas Jadhav',
-                email: 'shreyasjadhav@gmail.com',
-                username: 'shreyasjadhav',
-                password: 'shreyas123',
-                avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-                role: 'manager' as Role
-              };
-            }
-            return {
-              ...u,
-              id: 'user-2',
-              name: 'Sahil Parbale',
-              email: 'sahilparbale@gmail.com',
-              username: 'sahil',
-              password: u.password || 'password123',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-              role: 'employee' as Role,
-              title: 'Lead Full-Stack Engineer',
-              department: 'Engineering'
-            };
-          });
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const active = parsed.filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.email));
+          if (active.length > 0) return active;
         }
       }
-      return INITIAL_USERS;
+      return INITIAL_USERS.filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.email));
     } catch {
       return INITIAL_USERS;
     }
@@ -370,23 +359,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Sync Users & Live Presence
         if (cloudUsers && cloudUsers.length > 0) {
           setUsers(prevUsers => {
-            const updated = prevUsers.map(localUser => {
-              const matchedCloud = cloudUsers.find(cu => cu.id === localUser.id || cu.email === localUser.email);
-              if (matchedCloud) {
-                return {
-                  ...localUser,
-                  presence: matchedCloud.presence || localUser.presence,
-                  title: matchedCloud.title || localUser.title,
-                  department: matchedCloud.department || localUser.department,
-                  role: matchedCloud.role || localUser.role
-                };
-              }
-              return localUser;
-            });
+            const deletedSet = new Set(deletedUserIdsRef.current);
+            const activeCloudUsers = cloudUsers.filter(
+              cu => !deletedSet.has(cu.id) && !deletedSet.has(cu.email)
+            );
 
-            // Append any team members added from another session
-            cloudUsers.forEach(cu => {
-              if (!updated.some(u => u.id === cu.id)) {
+            const updated = prevUsers
+              .filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.email))
+              .map(localUser => {
+                const matchedCloud = activeCloudUsers.find(cu => cu.id === localUser.id || cu.email === localUser.email);
+                if (matchedCloud) {
+                  return {
+                    ...localUser,
+                    presence: matchedCloud.presence || localUser.presence,
+                    title: matchedCloud.title || localUser.title,
+                    department: matchedCloud.department || localUser.department,
+                    role: matchedCloud.role || localUser.role
+                  };
+                }
+                return localUser;
+              });
+
+            // Append any team members added from another session (excluding deleted members)
+            activeCloudUsers.forEach(cu => {
+              if (!updated.some(u => u.id === cu.id || u.email === cu.email)) {
                 updated.push(cu);
               }
             });
@@ -452,6 +448,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (cloudMessages !== null) {
           setMessages(prevMessages => {
             if (cloudMessages.length === 0) {
+              try {
+                localStorage.removeItem(`${STORAGE_KEY}_messages`);
+              } catch {}
               return [];
             }
             if (isSilent) {
@@ -594,8 +593,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           break;
         }
         case 'USER_DELETED': {
-          const { userId } = event.payload;
-          setUsers(prev => prev.filter(u => u.id !== userId));
+          const { userId, email } = event.payload;
+          setDeletedUserIds(prev => Array.from(new Set([...prev, userId, email].filter(Boolean))));
+          setUsers(prev => prev.filter(u => u.id !== userId && (!email || u.email !== email)));
           break;
         }
       }
@@ -814,6 +814,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       phone: data.phone?.trim()
     };
 
+    // Remove from deletedUserIds if previously deleted
+    setDeletedUserIds(prev => prev.filter(id => id !== newUserId && id !== newUser.email));
+
     setUsers(prev => [...prev, newUser]);
     upsertUserToSupabase(newUser);
     realtimeSync.broadcast('USER_CREATED', newUser);
@@ -850,21 +853,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Delete Employee (Managers only)
-  const deleteEmployee = (userId: string) => {
+  const deleteEmployee = async (userId: string) => {
     if (currentUser.role !== 'manager') {
       addToast('Permission Denied', 'Only Managers are authorized to remove team members.', 'warning');
       return;
     }
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
-    if (targetUser.role === 'manager') {
+    if (targetUser.role === 'manager' || targetUser.id === 'user-1' || targetUser.email === 'shreyasjadhav@gmail.com') {
       addToast('Cannot Remove Manager', 'Manager accounts cannot be deleted.', 'warning');
       return;
     }
 
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    deleteUserFromSupabase(userId);
-    realtimeSync.broadcast('USER_DELETED', { userId });
+    // Persist to deletedUserIds so background heartbeat polling never resurrects this employee
+    setDeletedUserIds(prev => Array.from(new Set([...prev, userId, targetUser.email])));
+
+    // Remove from active state and local storage immediately
+    setUsers(prev => {
+      const remaining = prev.filter(u => u.id !== userId && u.email !== targetUser.email);
+      try {
+        localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(remaining));
+      } catch {}
+      return remaining;
+    });
+
+    // Delete from Supabase cloud
+    await deleteUserFromSupabase(userId, targetUser.email);
+
+    // Broadcast removal across all connected tabs and devices
+    realtimeSync.broadcast('USER_DELETED', { userId, email: targetUser.email });
+
     addToast('Member Removed', `${targetUser.name} has been removed from the team roster.`, 'info');
   };
 

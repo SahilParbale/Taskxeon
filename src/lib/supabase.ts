@@ -1,7 +1,9 @@
 import { Project, Task, User, ActivityLog, Notification, ChatMessage, PresenceStatus } from '../types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://kgkggknznzumdhujsilj.supabase.co';
-const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+const SUPABASE_ANON_KEY =
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2dna256bnp1bWRodWpzaWxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2NDY4NDYsImV4cCI6MjEwODIyMjg0Nn0.52A9fLDD0OnozJLivQbA1_sShNsG5rvMcEQfclvAK6I';
 
 export type SupabaseStatus = 'connected' | 'connecting' | 'needs_migration' | 'disconnected';
 
@@ -246,9 +248,12 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
   }
 }
 
-export async function deleteUserFromSupabase(userId: string): Promise<boolean> {
+export async function deleteUserFromSupabase(userId: string, email?: string): Promise<boolean> {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    const filter = email
+      ? `or=(id.eq.${encodeURIComponent(userId)},email.eq.${encodeURIComponent(email)})`
+      : `id=eq.${encodeURIComponent(userId)}`;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?${filter}`, {
       method: 'DELETE',
       headers: getHeaders()
     });
