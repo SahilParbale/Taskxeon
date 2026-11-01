@@ -23,6 +23,7 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
     tasks,
     projects,
     users,
+    messages,
     logout,
     setIsSearchOpen,
     setUserPresence
@@ -84,7 +85,12 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
     {
       id: 'messages',
       label: 'Messages',
-      icon: <MessageSquare className="w-4 h-4" />
+      icon: <MessageSquare className="w-4 h-4" />,
+      badge: (() => {
+        const dms = messages.filter(m => m.recipientId && (m.recipientId === currentUser.id || (currentUser.email && m.recipientId.toLowerCase() === currentUser.email.toLowerCase())));
+        return dms.length > 0 ? `${dms.length} DM` : undefined;
+      })(),
+      badgeColor: 'bg-emerald-600 text-white border-transparent'
     }
   ];
 

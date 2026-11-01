@@ -136,6 +136,9 @@ interface AppContextType {
   sendNotification: (title: string, message: string, tone?: 'chime' | 'ring' | 'success' | 'message') => void;
   sendMessage: (text: string, channelId?: string, recipientId?: string) => void;
   clearMessages: () => void;
+  activeChatTarget: string;
+  setActiveChatTarget: (target: string) => void;
+  openChatWithUser: (userId: string) => void;
   resetAllData: () => void;
   addToast: (title: string, description?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   removeToast: (id: string) => void;
@@ -221,7 +224,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false);
   const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [activeChatTarget, setActiveChatTarget] = useState<string>('team');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const openChatWithUser = (userId: string) => {
+    setActiveChatTarget(userId);
+    setCurrentView('messages');
+  };
 
   // Global ⌘K / Ctrl+K keyboard shortcut listener for search
   useEffect(() => {
@@ -397,12 +406,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
         }
 
-        // Sync Messages (Team Chat) directly from Supabase Cloud (Single Source of Truth)
+        // Sync Messages (Team Chat & Direct Messages) directly from Supabase Cloud (Single Source of Truth)
         if (cloudMessages !== null) {
           setMessages(prevMessages => {
-            if (cloudMessages.length === 0) {
-              return [];
-            }
+            const cloudIds = new Set(cloudMessages.map(m => m.id));
+            // Preserve local in-flight messages created in the last 20 seconds not yet returned in cloud pull
+            const localPending = prevMessages.filter(m => {
+              if (cloudIds.has(m.id)) return false;
+              const match = m.id.match(/^msg-(\d+)/);
+              if (match) {
+                const time = parseInt(match[1], 10);
+                return Date.now() - time < 20000;
+              }
+              return false;
+            });
+
             if (isSilent) {
               const prevIds = new Set(prevMessages.map(m => m.id));
               // Filter out messages already seen or sent by the active user themselves
@@ -419,8 +437,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 addToast(`💬 ${latest.senderName || 'Team Member'}`, latest.text, 'info');
               }
             }
-            // Direct replacement from Supabase: deleted messages stay deleted across all devices
-            return cloudMessages;
+            return [...cloudMessages, ...localPending];
           });
         }
 
@@ -1179,24 +1196,57 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  // Send lightweight message
+  // Send message (Universal #team-chat or 1-on-1 Direct Messaging)
   const sendMessage = (text: string, channelId?: string, recipientId?: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    // Direct message channel key or universal team channel
+    const targetChannel = recipientId
+      ? `dm-${[currentUser.id, recipientId].sort().join('-')}`
+      : (channelId || 'ch-team-chat');
+
     const newMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       senderId: currentUser.id,
       senderName: currentUser.name,
       senderAvatar: currentUser.avatar,
       senderRole: currentUser.role,
       senderTitle: currentUser.title,
-      text,
+      text: trimmed,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      channelId: channelId || 'ch-team-chat',
-      recipientId
+      channelId: targetChannel,
+      recipientId: recipientId || undefined
     };
+
+    // 1. Optimistic instant local state update
     setMessages(prev => [...prev, newMsg]);
+
+    // 2. Direct database cloud write
     insertMessageToSupabase(newMsg);
+
+    // 3. Instant local cross-tab broadcast
     realtimeSync.broadcast('MESSAGE_SENT', newMsg);
-    // Note: Do not play incoming chime or trigger notifications for the sender's own message
+
+    // 4. If direct message, dispatch an in-app notification to the recipient in Supabase
+    if (recipientId) {
+      const recipientUser = users.find(u => u.id === recipientId || (u.email && u.email.toLowerCase() === recipientId.toLowerCase()));
+      if (recipientUser && recipientUser.id !== currentUser.id) {
+        const msgNotif: Notification = {
+          id: `notif-${Date.now()}`,
+          userId: recipientUser.id,
+          senderId: currentUser.id,
+          title: `💬 Direct message from ${currentUser.name}`,
+          message: trimmed.length > 60 ? `${trimmed.substring(0, 57)}...` : trimmed,
+          type: 'message',
+          read: false,
+          createdAt: new Date().toISOString()
+        };
+        setNotifications(prev => [msgNotif, ...prev]);
+        upsertNotificationToSupabase(msgNotif);
+        realtimeSync.broadcast('NOTIFICATION_CREATED', msgNotif);
+      }
+    }
   };
 
   // Clear all team chat messages directly from Supabase Cloud
@@ -1399,6 +1449,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sendNotification,
         sendMessage,
         clearMessages,
+        activeChatTarget,
+        setActiveChatTarget,
+        openChatWithUser,
         resetAllData,
         addToast,
         removeToast,

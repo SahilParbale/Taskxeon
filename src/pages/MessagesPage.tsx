@@ -29,11 +29,11 @@ export const MessagesPage: React.FC = () => {
     sendMessage,
     clearMessages,
     addToast,
-    isMessagesTableMissing
+    isMessagesTableMissing,
+    activeChatTarget,
+    setActiveChatTarget
   } = useApp();
 
-  // Active chat target: 'team' for universal #team-chat, or a specific user ID for 1-on-1 Direct Messages
-  const [activeTab, setActiveTab] = useState<'team' | string>('team');
   const [inputText, setInputText] = useState('');
   const [inThreadSearch, setInThreadSearch] = useState('');
   const [isThreadSearchOpen, setIsThreadSearchOpen] = useState(false);
@@ -45,21 +45,33 @@ export const MessagesPage: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Helper to match user across ID aliases, email, or name
-  const isUserMatch = (idOrEmail?: string, targetUser?: User): boolean => {
+  const isUserMatch = (idOrEmail?: string, targetUser?: User | null): boolean => {
     if (!idOrEmail || !targetUser) return false;
-    if (idOrEmail === targetUser.id) return true;
-    if (targetUser.email && idOrEmail.toLowerCase() === targetUser.email.toLowerCase()) return true;
-    if (targetUser.username && idOrEmail.toLowerCase() === targetUser.username.toLowerCase()) return true;
-    // Resilient fallback for Sahil persona ID variations (user-2 vs user-1793433013262)
-    if (targetUser.name.includes('Sahil') && (idOrEmail === 'user-2' || idOrEmail.includes('sahil'))) return true;
+    const val = idOrEmail.toLowerCase().trim();
+    if (targetUser.id.toLowerCase() === val) return true;
+    if (targetUser.email && targetUser.email.toLowerCase() === val) return true;
+    if (targetUser.username && targetUser.username.toLowerCase() === val) return true;
+    if (targetUser.name && targetUser.name.toLowerCase() === val) return true;
+
+    // First name match
+    const firstName = targetUser.name.split(' ')[0].toLowerCase();
+    if (firstName && (val === firstName || val.startsWith(firstName))) return true;
+
+    // Resilient fallback for Shreyas and Sahil personas
+    if (targetUser.id === 'user-1' || targetUser.name.toLowerCase().includes('shreyas')) {
+      if (val === 'user-1' || val.includes('shreyas')) return true;
+    }
+    if (targetUser.id === 'user-2' || targetUser.name.toLowerCase().includes('sahil')) {
+      if (val === 'user-2' || val.includes('sahil')) return true;
+    }
     return false;
   };
 
   // Active recipient user object if in Direct Message mode
   const activeRecipient = useMemo(() => {
-    if (activeTab === 'team') return null;
-    return users.find(u => u.id === activeTab) || null;
-  }, [activeTab, users]);
+    if (activeChatTarget === 'team') return null;
+    return users.find(u => u.id === activeChatTarget || isUserMatch(activeChatTarget, u)) || null;
+  }, [activeChatTarget, users]);
 
   // Online count across team
   const onlineCount = users.filter(u => u.presence === 'online').length;
@@ -69,19 +81,55 @@ export const MessagesPage: React.FC = () => {
     return users.filter(u => u.id !== currentUser.id && u.email !== currentUser.email);
   }, [users, currentUser]);
 
-  // Filter messages by active conversation (Team Chat vs 1-on-1 Direct Message by ID)
+  // Direct message summaries for sidebar items (latest message snippet & timestamp)
+  const membersWithDmMeta = useMemo(() => {
+    return otherMembers.map(member => {
+      const dms = messages.filter(m => {
+        const fromMe = isUserMatch(m.senderId, currentUser) && isUserMatch(m.recipientId, member);
+        const toMe = isUserMatch(m.senderId, member) && isUserMatch(m.recipientId, currentUser);
+        return fromMe || toMe;
+      });
+
+      const lastMessage = dms.length > 0 ? dms[dms.length - 1] : null;
+      const unreadCount = dms.filter(m => isUserMatch(m.senderId, member) && activeChatTarget !== member.id).length;
+
+      return {
+        ...member,
+        lastMessage,
+        unreadCount
+      };
+    });
+  }, [otherMembers, messages, currentUser, activeChatTarget]);
+
+  // Check if any teammate sent a direct message while looking at Team Chat
+  const pendingDmNotification = useMemo(() => {
+    if (activeChatTarget !== 'team') return null;
+    const directMessagesToMe = messages.filter(m =>
+      m.recipientId && isUserMatch(m.recipientId, currentUser) && !isUserMatch(m.senderId, currentUser)
+    );
+    if (directMessagesToMe.length === 0) return null;
+    const latest = directMessagesToMe[directMessagesToMe.length - 1];
+    const sender = users.find(u => isUserMatch(latest.senderId, u));
+    return {
+      sender,
+      message: latest
+    };
+  }, [activeChatTarget, messages, currentUser, users]);
+
+  // Filter messages by active conversation:
+  // - 'team': strictly universal #team-chat messages (no recipientId, and channelId === 'ch-team-chat')
+  // - Direct Message: strictly messages between currentUser and activeRecipient
   const conversationMessages = useMemo(() => {
-    if (activeTab === 'team') {
-      return messages.filter(m => !m.recipientId || m.channelId === 'ch-team-chat');
+    if (activeChatTarget === 'team') {
+      return messages.filter(m => !m.recipientId && (!m.channelId || m.channelId === 'ch-team-chat'));
     }
     if (!activeRecipient) return [];
     return messages.filter(m => {
-      // Direct message between active user and selected recipient
       const fromMeToRecipient = isUserMatch(m.senderId, currentUser) && isUserMatch(m.recipientId, activeRecipient);
-      const fromRecipientToMe = isUserMatch(m.senderId, activeRecipient) && (isUserMatch(m.recipientId, currentUser) || !m.recipientId);
+      const fromRecipientToMe = isUserMatch(m.senderId, activeRecipient) && isUserMatch(m.recipientId, currentUser);
       return fromMeToRecipient || fromRecipientToMe;
     });
-  }, [messages, activeTab, activeRecipient, currentUser]);
+  }, [messages, activeChatTarget, activeRecipient, currentUser]);
 
   // Apply in-thread text search if active
   const displayedMessages = useMemo(() => {
@@ -94,7 +142,7 @@ export const MessagesPage: React.FC = () => {
   // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayedMessages.length, activeTab]);
+  }, [displayedMessages.length, activeChatTarget]);
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -162,18 +210,18 @@ export const MessagesPage: React.FC = () => {
             </div>
             <button
               onClick={() => {
-                setActiveTab('team');
+                setActiveChatTarget('team');
                 setIsMobileSidebarOpen(false);
               }}
               className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
-                activeTab === 'team'
+                activeChatTarget === 'team'
                   ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200/80 shadow-2xs'
                   : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  activeTab === 'team' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                  activeChatTarget === 'team' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
                 }`}>
                   <Hash className="w-4 h-4" />
                 </div>
@@ -191,16 +239,16 @@ export const MessagesPage: React.FC = () => {
             <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
               <span>Direct Messages</span>
               <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-semibold">
-                {otherMembers.length}
+                {membersWithDmMeta.length}
               </span>
             </div>
 
             <div className="space-y-1 mt-1">
-              {otherMembers.length === 0 ? (
+              {membersWithDmMeta.length === 0 ? (
                 <p className="px-3 py-2 text-xs text-slate-400 italic">No other members registered.</p>
               ) : (
-                otherMembers.map(member => {
-                  const isSelected = activeTab === member.id;
+                membersWithDmMeta.map(member => {
+                  const isSelected = activeChatTarget === member.id || isUserMatch(activeChatTarget, member);
                   const isOnline = member.presence === 'online';
                   const isOnBreak = member.presence === 'break';
 
@@ -208,7 +256,7 @@ export const MessagesPage: React.FC = () => {
                     <button
                       key={member.id}
                       onClick={() => {
-                        setActiveTab(member.id);
+                        setActiveChatTarget(member.id);
                         setIsMobileSidebarOpen(false);
                       }}
                       className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
@@ -217,7 +265,7 @@ export const MessagesPage: React.FC = () => {
                           : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="relative flex-shrink-0">
                           <img
                             src={member.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
@@ -231,20 +279,36 @@ export const MessagesPage: React.FC = () => {
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-xs truncate">{member.name}</p>
-                            {member.role === 'manager' && (
-                              <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
-                                MGR
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <p className="text-xs truncate font-semibold">{member.name}</p>
+                              {member.role === 'manager' && (
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
+                                  MGR
+                                </span>
+                              )}
+                            </div>
+                            {member.lastMessage && (
+                              <span className="text-[9px] text-slate-400 font-normal tabular-nums flex-shrink-0">
+                                {member.lastMessage.timestamp}
                               </span>
                             )}
                           </div>
-                          <p className="text-[10px] text-slate-400 truncate font-normal">
-                            {member.title || 'Team Member'}
-                          </p>
+                          <div className="flex items-center justify-between gap-1 mt-0.5">
+                            <p className="text-[10px] text-slate-400 truncate font-normal">
+                              {member.lastMessage
+                                ? `${isUserMatch(member.lastMessage.senderId, currentUser) ? 'You: ' : ''}${member.lastMessage.text}`
+                                : (member.title || 'Team Member')}
+                            </p>
+                            {member.unreadCount > 0 && (
+                              <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex-shrink-0">
+                                {member.unreadCount}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <ChevronRight className={`w-3.5 h-3.5 text-slate-400 flex-shrink-0 ${isSelected ? 'text-emerald-700' : 'opacity-0 hover:opacity-100'}`} />
+                      <ChevronRight className={`w-3.5 h-3.5 ml-1 text-slate-400 flex-shrink-0 ${isSelected ? 'text-emerald-700' : 'opacity-0 hover:opacity-100'}`} />
                     </button>
                   );
                 })
@@ -294,7 +358,7 @@ export const MessagesPage: React.FC = () => {
               <Menu className="w-5 h-5" />
             </button>
 
-            {activeTab === 'team' ? (
+            {activeChatTarget === 'team' ? (
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 shadow-soft-sm border border-emerald-100">
                   <Hash className="w-5 h-5 text-emerald-700" />
@@ -351,7 +415,7 @@ export const MessagesPage: React.FC = () => {
 
           {/* Search & Actions */}
           <div className="flex items-center gap-2">
-            {conversationMessages.length > 0 && activeTab === 'team' && (
+            {conversationMessages.length > 0 && activeChatTarget === 'team' && (
               <button
                 onClick={() => {
                   if (window.confirm('Clear all messages from Team Chat?')) {
@@ -380,6 +444,31 @@ export const MessagesPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Actionable Banner: Direct Message received while on Team Chat */}
+        {pendingDmNotification && (
+          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex items-center justify-between gap-3 text-xs shadow-2xs animate-in fade-in z-10 flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-soft-sm">
+                💬
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-emerald-950 truncate">
+                  Direct message from {pendingDmNotification.sender?.name || 'Team Member'}
+                </p>
+                <p className="text-[11px] text-emerald-800 truncate font-normal">
+                  "{pendingDmNotification.message.text}"
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveChatTarget(pendingDmNotification.sender?.id || pendingDmNotification.message.senderId)}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors flex-shrink-0 cursor-pointer shadow-soft-sm hover:shadow"
+            >
+              Open Direct Chat →
+            </button>
+          </div>
+        )}
+
         {/* Database Missing Notice Banner */}
         {isMessagesTableMissing && !isNoticeDismissed && (
           <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in z-10 flex-shrink-0">
@@ -398,7 +487,7 @@ export const MessagesPage: React.FC = () => {
                 Copy SQL Script
               </button>
               <a
-                href="https://supabase.com/dashboard/project/kgkggknznzumdhujsilj/sql"
+                href="https://supabase.com/dashboard/project/xdwkcybxgqdtnpnypxfj/sql"
                 target="_blank"
                 rel="noreferrer"
                 className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 font-semibold flex items-center gap-1 text-[11px] transition-colors"

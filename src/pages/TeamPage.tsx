@@ -30,6 +30,7 @@ export const TeamPage: React.FC = () => {
     tasks,
     setUserPresence,
     setCurrentView,
+    openChatWithUser,
     setIsCreateEmployeeModalOpen,
     setIsCreateModalOpen,
     deleteEmployee
@@ -418,8 +419,8 @@ export const TeamPage: React.FC = () => {
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setCurrentView('messages')}
-                      className="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                      onClick={() => openChatWithUser(member.id)}
+                      className="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
                       <span>Message</span>

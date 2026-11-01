@@ -34,6 +34,7 @@ export const NotificationDropdown: React.FC<{
     setSelectedTaskId,
     setSelectedProjectId,
     setCurrentView,
+    openChatWithUser,
     addToast
   } = useApp();
 
@@ -104,7 +105,9 @@ export const NotificationDropdown: React.FC<{
     } else if (notif.projectId) {
       setSelectedProjectId(notif.projectId);
       setCurrentView('project_detail');
-    } else if (notif.type === 'system') {
+    } else if (notif.type === 'message' && notif.senderId) {
+      openChatWithUser(notif.senderId);
+    } else if (notif.type === 'system' || notif.type === 'message') {
       setCurrentView('messages');
     }
     setIsOpen(false);

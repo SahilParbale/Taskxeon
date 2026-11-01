@@ -8,7 +8,7 @@ export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'completed';
 
 export type ProjectHealth = 'on_track' | 'at_risk' | 'behind';
 
-export type NotificationType = 'assignment' | 'completion' | 'reassignment' | 'overdue' | 'system';
+export type NotificationType = 'assignment' | 'completion' | 'reassignment' | 'overdue' | 'system' | 'message';
 
 export interface User {
   id: string;
