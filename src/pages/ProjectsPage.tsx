@@ -292,7 +292,7 @@ export const ProjectsPage: React.FC = () => {
                     : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
                 }`}
               >
-                {target}% {target === 100 ? '🎉 Live' : ''}
+                {target}% {target === 100 ? 'Live' : ''}
               </button>
             ))}
           </div>

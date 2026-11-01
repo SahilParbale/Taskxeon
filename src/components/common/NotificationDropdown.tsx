@@ -75,10 +75,10 @@ export const NotificationDropdown: React.FC<{
     const newPerm = await requestSystemNotificationPermission();
     setPermission(newPerm);
     if (newPerm === 'granted') {
-      await dispatchSystemNotification('TaskFlow Notifications Enabled 🎉', {
+      await dispatchSystemNotification('TaskFlow Notifications Enabled', {
         body: 'System notifications and default OS ring sounds are now active for your workspace.'
       });
-      addToast('System Notifications Active! 🔔', 'Default OS notification banner and ring chime enabled.', 'success');
+      addToast('System Notifications Active', 'Default OS notification banner and ring chime enabled.', 'success');
     } else if (newPerm === 'denied') {
       addToast('Notifications Blocked', 'Please enable notifications in your browser address bar site settings.', 'warning');
     }
@@ -86,13 +86,13 @@ export const NotificationDropdown: React.FC<{
 
   const handleTestSystemNotification = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const result = await dispatchSystemNotification('TaskFlow Alert 🔔', {
+    const result = await dispatchSystemNotification('TaskFlow Alert', {
       body: `System notification received for ${currentUser.name}. Default OS ring & toast alert active!`,
       tag: 'taskflow-system-test'
     });
     setPermission(result);
     if (result === 'granted') {
-      addToast('System Notification Sent 🔔', 'Triggered OS notification banner with default system sound.', 'success');
+      addToast('System Notification Sent', 'Triggered OS notification banner with default system sound.', 'success');
     } else if (result === 'denied') {
       addToast('System Permission Blocked', 'Please allow notifications in your browser site settings.', 'warning');
     }

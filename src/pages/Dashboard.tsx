@@ -447,7 +447,7 @@ export const Dashboard: React.FC = () => {
                               onClick={e => {
                                 e.stopPropagation();
                                 sendMessage(
-                                  `💬 Let's discuss task "${t.title}" (Due: ${t.dueDate} | Priority: ${t.priority.toUpperCase()})`,
+                                  `Let's discuss task "${t.title}" (Due: ${t.dueDate} | Priority: ${t.priority.toUpperCase()})`,
                                   'ch-team-chat'
                                 );
                                 setCurrentView('messages');

@@ -157,7 +157,7 @@ export const TaskDetailModal: React.FC = () => {
                     onClick={() => {
                       setSelectedTaskId(null);
                       sendMessage(
-                        `💬 Let's discuss task "${task.title}" (Due: ${task.dueDate} | Priority: ${task.priority.toUpperCase()})`,
+                        `Let's discuss task "${task.title}" (Due: ${task.dueDate} | Priority: ${task.priority.toUpperCase()})`,
                         'ch-team-chat'
                       );
                       setCurrentView('messages');

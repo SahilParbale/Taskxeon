@@ -16,7 +16,8 @@ import {
   Folder,
   ChevronLeft,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  X
 } from 'lucide-react';
 import { getTodayDateString, isToday, isPastDate, formatCustomDateLabel } from '../lib/dateUtils';
 import { CustomSelect } from '../components/common/CustomSelect';
@@ -37,7 +38,7 @@ export const TasksPage: React.FC = () => {
 
   const handleDiscussInGroupChat = (task: any) => {
     sendMessage(
-      `💬 Let's discuss task "${task.title}" (Due: ${task.dueDate} | Priority: ${task.priority.toUpperCase()})`,
+      `Let's discuss task "${task.title}" (Due: ${task.dueDate} | Priority: ${task.priority.toUpperCase()})`,
       'ch-team-chat'
     );
     setCurrentView('messages');
@@ -358,10 +359,10 @@ export const TasksPage: React.FC = () => {
           onChange={val => setSelectedDateScope(val as any)}
           options={[
             { value: 'all', label: `All Dates (${totalScopeCount})` },
-            { value: 'today', label: `⚡ Due Today (${todayTasksCount})` },
-            { value: 'previous', label: `🕒 Previous (${previousTasksCount})` },
-            { value: 'upcoming', label: `🚀 Upcoming (${upcomingTasksCount})` },
-            { value: 'custom', label: `📅 Custom Day (${customDateTasksCount})` }
+            { value: 'today', label: `Due Today (${todayTasksCount})` },
+            { value: 'previous', label: `Previous (${previousTasksCount})` },
+            { value: 'upcoming', label: `Upcoming (${upcomingTasksCount})` },
+            { value: 'custom', label: `Custom Day (${customDateTasksCount})` }
           ]}
         />
 
@@ -497,9 +498,10 @@ export const TasksPage: React.FC = () => {
             </button>
             <button
               onClick={() => setSelectedDateScope('all')}
-              className="px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-semibold text-[11px] transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-semibold text-[11px] transition-colors cursor-pointer"
             >
-              View All Dates ✕
+              <span>View All Dates</span>
+              <X className="w-3 h-3 text-emerald-700" />
             </button>
           </div>
         </div>

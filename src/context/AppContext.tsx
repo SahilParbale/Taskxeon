@@ -362,11 +362,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               if (newlyAssigned.length > 0) {
                 soundManager.play('ring');
                 newlyAssigned.forEach(nt => {
-                  dispatchSystemNotification('New Task Assigned 📋', {
+                  dispatchSystemNotification('New Task Assigned', {
                     body: `Manager assigned you: "${nt.title}"`,
                     data: { taskId: nt.id }
                   });
-                  addToast('New Task Assigned 📋', `You were assigned: "${nt.title}"`, 'info');
+                  addToast('New Task Assigned', `You were assigned: "${nt.title}"`, 'info');
                 });
               }
             }
@@ -430,11 +430,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               if (newIncoming.length > 0) {
                 const latest = newIncoming[newIncoming.length - 1];
                 soundManager.play('message');
-                dispatchSystemNotification(`💬 ${latest.senderName || 'Team Chat'}`, {
+                dispatchSystemNotification(latest.senderName || 'Team Chat', {
                   body: latest.text,
                   data: { channelId: latest.channelId }
                 });
-                addToast(`💬 ${latest.senderName || 'Team Member'}`, latest.text, 'info');
+                addToast(latest.senderName || 'Team Member', latest.text, 'info');
               }
             }
             return [...cloudMessages, ...localPending];
@@ -442,7 +442,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         if (!isSilent) {
-          addToast('Supabase Connected 🟢', `Cloud DB in sync (${health.latencyMs}ms)`, 'success');
+          addToast('Supabase Connected', `Cloud DB in sync (${health.latencyMs}ms)`, 'success');
         }
       }
     } catch (err) {
@@ -471,11 +471,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
           if (newTask.assigneeId === currentUserIdRef.current && !isSelf(newTask.createdById)) {
             soundManager.play('ring');
-            dispatchSystemNotification('New Task Assigned 📋', {
+            dispatchSystemNotification('New Task Assigned', {
               body: `Manager assigned you: "${newTask.title}"`,
               data: { taskId: newTask.id }
             });
-            addToast('New Task Assigned 📋', `You have been assigned: "${newTask.title}"`, 'info');
+            addToast('New Task Assigned', `You have been assigned: "${newTask.title}"`, 'info');
           }
           break;
         }
@@ -505,11 +505,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // Strictly suppress incoming notification ring, system notification & toast if sent by self
           if (!isSelf(newMsg.senderId, newMsg.senderName)) {
             soundManager.play('message');
-            dispatchSystemNotification(`💬 ${newMsg.senderName || 'Team Member'}`, {
+            dispatchSystemNotification(newMsg.senderName || 'Team Member', {
               body: newMsg.text,
               data: { channelId: newMsg.channelId }
             });
-            addToast(`💬 ${newMsg.senderName || 'Team Member'}`, newMsg.text, 'info');
+            addToast(newMsg.senderName || 'Team Member', newMsg.text, 'info');
           }
           break;
         }
@@ -678,7 +678,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setActivities(prev => [newAct, ...prev]);
     insertActivityToSupabase(newAct);
 
-    addToast('Project Created 🎉', `"${data.name}" [${data.key.toUpperCase()}] is now active`, 'success');
+    addToast('Project Created', `"${data.name}" [${data.key.toUpperCase()}] is now active`, 'success');
   };
 
   // Update Project Members (Managers only)
@@ -798,14 +798,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       senderRole: currentUser.role,
       senderTitle: currentUser.title,
       channelId: 'ch-team-chat',
-      text: `🎉 Welcome ${newUser.name} to the team as ${newUser.title}!`,
+      text: `Welcome ${newUser.name} to the team as ${newUser.title}!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages(prev => [...prev, welcomeMsg]);
     insertMessageToSupabase(welcomeMsg);
     realtimeSync.broadcast('MESSAGE_SENT', welcomeMsg);
 
-    addToast('Employee Onboarded 🎉', `${newUser.name} added to the team & Team Chat!`, 'success');
+    addToast('Employee Onboarded', `${newUser.name} added to the team & Team Chat!`, 'success');
   };
 
   // Delete Employee (Managers only)
@@ -1014,7 +1014,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setActivities(prev => [newAct, ...prev]);
 
     addToast(
-      'Task Created 🎉',
+      'Task Created',
       `"${data.title}" assigned to ${assignee?.name || 'team'}${targetProj ? ` in [${targetProj.key}] ${targetProj.name}` : ''}`,
       'success'
     );
@@ -1075,12 +1075,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       soundManager.play('success');
-      dispatchSystemNotification('Task Completed! 🎉', {
+      dispatchSystemNotification('Task Completed!', {
         body: `"${task.title}" marked as completed by ${currentUser.name}`,
         data: { taskId: task.id }
       });
 
-      addToast('Task Completed! 🎉', `"${task.title}" marked as completed.`, 'success');
+      addToast('Task Completed!', `"${task.title}" marked as completed.`, 'success');
     } else {
       addToast('Status Updated', `Task moved to ${status.replace('_', ' ')}`, 'info');
       dispatchSystemNotification(`Task Status Updated`, {
@@ -1237,7 +1237,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           id: `notif-${Date.now()}`,
           userId: recipientUser.id,
           senderId: currentUser.id,
-          title: `💬 Direct message from ${currentUser.name}`,
+          title: `Direct message from ${currentUser.name}`,
           message: trimmed.length > 60 ? `${trimmed.substring(0, 57)}...` : trimmed,
           type: 'message',
           read: false,
@@ -1369,7 +1369,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     addToast(
-      `Welcome, ${matchedUser.name}! 👋`,
+      `Welcome, ${matchedUser.name}!`,
       `Signed in as ${matchedUser.role === 'manager' ? 'Manager' : 'Employee'}. Workspace unlocked.`,
       'success'
     );

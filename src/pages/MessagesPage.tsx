@@ -7,7 +7,6 @@ import {
   Send,
   Search,
   CheckCheck,
-  Smile,
   X,
   Trash2,
   Hash,
@@ -27,8 +26,6 @@ import {
   Info
 } from 'lucide-react';
 import { User } from '../types';
-
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '🚀', '🎉', '🔥', '👏', '🙏', '💯', '✨', '💡', '✅', '🙌'];
 
 export const MessagesPage: React.FC = () => {
   const {
@@ -50,7 +47,6 @@ export const MessagesPage: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [inThreadSearch, setInThreadSearch] = useState('');
   const [isThreadSearchOpen, setIsThreadSearchOpen] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isNoticeDismissed, setIsNoticeDismissed] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
@@ -196,18 +192,12 @@ export const MessagesPage: React.FC = () => {
     }
 
     setInputText('');
-    setShowEmojiPicker(false);
-    inputRef.current?.focus();
-  };
-
-  const handleAddEmoji = (emoji: string) => {
-    setInputText(prev => prev + emoji);
     inputRef.current?.focus();
   };
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(MESSAGES_TABLE_SQL);
-    addToast('SQL Copied to Clipboard 📋', 'Paste this into Supabase SQL Editor and click Run.', 'success');
+    addToast('SQL Copied to Clipboard', 'Paste this into Supabase SQL Editor and click Run.', 'success');
   };
 
   return (
@@ -351,7 +341,7 @@ export const MessagesPage: React.FC = () => {
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
                     </div>
                     <p className="text-[10px] text-slate-400 truncate font-normal mt-0.5">
-                      🔒 Universal E2EE • All {users.length} members
+                      Universal E2EE • All {users.length} members
                     </p>
                   </div>
                 </div>
@@ -626,7 +616,7 @@ export const MessagesPage: React.FC = () => {
           <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex items-center justify-between gap-3 text-xs shadow-2xs animate-in fade-in z-10 flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-soft-sm">
-                💬
+                <MessageSquare className="w-4 h-4 text-white" />
               </div>
               <div className="min-w-0">
                 <p className="font-bold text-emerald-950 truncate">
@@ -749,21 +739,21 @@ export const MessagesPage: React.FC = () => {
               <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
                 <button
                   onClick={() => {
-                    setInputText(activeRecipient ? `Hi ${activeRecipient.name}, can we sync on our deliverables?` : '👋 Hi team, checking in for today!');
+                    setInputText(activeRecipient ? `Hi ${activeRecipient.name}, can we sync on our deliverables?` : 'Hi team, checking in for today!');
                     inputRef.current?.focus();
                   }}
                   className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-800 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
                 >
-                  👋 Say Hello
+                  Say Hello
                 </button>
                 <button
                   onClick={() => {
-                    setInputText('🚀 Everything is on track for this sprint!');
+                    setInputText('Everything is on track for this sprint!');
                     inputRef.current?.focus();
                   }}
                   className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-800 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
                 >
-                  🚀 Sprint Update
+                  Sprint Update
                 </button>
                 {activeRecipient && currentUser.role === 'manager' && (
                   <button
@@ -780,16 +770,16 @@ export const MessagesPage: React.FC = () => {
             displayedMessages.map(msg => {
               const sender = users.find(u => isUserMatch(msg.senderId, u));
               const isMe = isUserMatch(msg.senderId, currentUser) || (currentUser.name && msg.senderName === currentUser.name);
-              const isAnnouncement = msg.text.startsWith('🎉 Welcome');
+              const isAnnouncement = msg.text.includes('Welcome');
 
               // System auto-onboarding announcement card
               if (isAnnouncement) {
                 return (
                   <div key={msg.id} className="flex justify-center my-3">
                     <div className="bg-emerald-50/90 border border-emerald-200 text-emerald-950 rounded-2xl px-4 py-2.5 max-w-md shadow-2xs text-xs flex items-center gap-2.5">
-                      <span className="text-base flex-shrink-0">🎉</span>
+                      <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-emerald-900 leading-snug">{msg.text}</p>
+                        <p className="font-semibold text-emerald-900 leading-snug">{msg.text.replace(/^[^\w\s]+/, '').trim()}</p>
                         <span className="text-[10px] text-emerald-700/80 mt-0.5 block">{msg.timestamp}</span>
                       </div>
                     </div>
@@ -900,44 +890,12 @@ export const MessagesPage: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Reaction Emojis Drawer */}
-        {showEmojiPicker && (
-          <div className="p-2.5 bg-white border-t border-slate-200 flex items-center justify-center gap-1.5 flex-wrap flex-shrink-0 animate-in fade-in slide-in-from-bottom-2 z-10">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2">
-              Quick React:
-            </span>
-            {QUICK_EMOJIS.map(emoji => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => handleAddEmoji(emoji)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-base transition-transform active:scale-125 cursor-pointer"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* FIXED BOTTOM INPUT BAR */}
         <div className="bg-white border-t border-slate-200 flex-shrink-0 z-10 shadow-soft-sm">
           <form
             onSubmit={handleSend}
             className="max-w-4xl mx-auto p-3 sm:p-4 flex items-center gap-2 sm:gap-3"
           >
-            <button
-              type="button"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`p-2 rounded-xl transition-colors cursor-pointer ${
-                showEmojiPicker
-                  ? 'text-emerald-700 bg-emerald-50'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-              }`}
-              title="Emoji Reactions"
-            >
-              <Smile className="w-5 h-5" />
-            </button>
-
             <div className="relative flex-1">
               <input
                 ref={inputRef}
@@ -946,8 +904,8 @@ export const MessagesPage: React.FC = () => {
                 onChange={e => setInputText(e.target.value)}
                 placeholder={
                   activeRecipient
-                    ? `🔒 Encrypted message to ${activeRecipient.name}...`
-                    : '🔒 Encrypted message to team...'
+                    ? `Message ${activeRecipient.name}...`
+                    : 'Message the team...'
                 }
                 className="w-full px-4 py-2.5 pr-20 text-xs sm:text-sm rounded-xl border border-slate-200/90 bg-slate-50 hover:bg-slate-100/60 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 shadow-2xs transition-all"
               />
@@ -966,8 +924,8 @@ export const MessagesPage: React.FC = () => {
               <span className="hidden sm:inline">Send</span>
             </button>
           </form>
-          <div className="text-center pb-2 text-[10px] text-slate-400 font-medium">
-            🔒 Client-side AES-256-GCM authenticated encryption • Stored as ciphertext in Supabase Cloud
+          <div className="text-center pb-2 text-[10px] text-slate-400 font-medium flex items-center justify-center gap-1">
+            <Lock className="w-2.5 h-2.5 text-slate-400 inline" /> Client-side AES-256-GCM authenticated encryption • Stored as ciphertext in Supabase Cloud
           </div>
         </div>
       </div>

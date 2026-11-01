@@ -135,7 +135,7 @@ export async function decryptTextMessage(
     return { text: decryptedText, isEncrypted: true };
   } catch (err) {
     console.warn('[E2EE] Decryption error:', err);
-    return { text: rawText.replace(E2EE_PREFIX, '🔒 [Encrypted Message] '), isEncrypted: true };
+    return { text: rawText.replace(E2EE_PREFIX, '[Encrypted Message] '), isEncrypted: true };
   }
 }
 
