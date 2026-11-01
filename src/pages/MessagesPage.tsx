@@ -468,14 +468,6 @@ export const MessagesPage: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowSecurityModal(true)}
-            className="p-1.5 rounded-lg bg-white border border-slate-200 text-emerald-700 hover:bg-emerald-50 text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
-            title="E2EE Security Status"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="hidden sm:inline">AES-256</span>
-          </button>
         </div>
       </div>
 
@@ -513,9 +505,6 @@ export const MessagesPage: React.FC = () => {
                     <h2 className="text-base font-bold text-slate-900 tracking-tight truncate">
                       Team Chat
                     </h2>
-                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> E2EE Channel
-                    </span>
                   </div>
                   <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
@@ -551,9 +540,6 @@ export const MessagesPage: React.FC = () => {
                       </h2>
                       <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full capitalize">
                         {activeRecipient.role}
-                      </span>
-                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
-                        <Lock className="w-2.5 h-2.5 text-emerald-600" /> AES-256 E2EE
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 truncate mt-0.5">
