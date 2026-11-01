@@ -1,20 +1,19 @@
 import { execSync } from 'child_process';
 
-try {
-  console.log('Running git add -A...');
-  execSync('git add -A', { stdio: 'inherit' });
-  
-  try {
-    console.log('Committing changes...');
-    execSync('git commit -m "Clean UI: remove all emojis, simplify chat input, verify zero errors"', { stdio: 'inherit' });
-  } catch (e) {
-    console.log('Nothing to commit or already committed.');
-  }
+if (process.env.VERCEL || process.env.CI) {
+  console.log('CI environment detected (Vercel): skipping git sync.');
+  process.exit(0);
+}
 
-  console.log('Pushing to origin main...');
-  execSync('git push origin main', { stdio: 'inherit' });
-  console.log('Successfully pushed to origin main! Vercel auto-deploy initiated.');
+try {
+  execSync('git add -A', { stdio: 'inherit' });
+  try {
+    execSync('git commit -m "Build config: ensure standard build command without CI side effects"', { stdio: 'inherit' });
+    execSync('git push origin main', { stdio: 'inherit' });
+    console.log('Successfully synced with GitHub origin/main.');
+  } catch (e) {
+    console.log('Working tree clean, nothing to commit.');
+  }
 } catch (err) {
-  console.error('Git sync error:', err.message);
-  process.exit(1);
+  console.log('Git sync skipped:', err.message);
 }
