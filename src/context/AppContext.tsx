@@ -193,6 +193,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (e) {
       console.warn('Error purging legacy localStorage keys', e);
     }
+
+    // Ensure all default personas (Software + Marketing) are present in Supabase on startup
+    ensureDefaultUsersInSupabase().catch(() => {});
   }, []);
 
   // Pure Database-Driven State: All business data originates strictly from Supabase PostgreSQL
@@ -407,11 +410,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             u.email !== 'marcus.vance@company.com'
           );
 
-          if (filteredCloudUsers.length > 0) {
-            setUsers(filteredCloudUsers);
+          // Ensure default personas (Software + Marketing) are always present and preserved in state
+          const existingEmails = new Set(filteredCloudUsers.map(u => u.email.toLowerCase()));
+          const missingDefaults = INITIAL_USERS.filter(du => !existingEmails.has(du.email.toLowerCase()));
+          if (missingDefaults.length > 0) {
+            for (const du of missingDefaults) {
+              upsertUserToSupabase(du).catch(() => {});
+            }
+          }
+
+          const allMergedUsers = [...filteredCloudUsers, ...missingDefaults];
+          if (allMergedUsers.length > 0) {
+            setUsers(allMergedUsers);
           }
         } else if (cloudUsers && cloudUsers.length === 0) {
-          // Database users table is empty; populate Shreyas and Sahil into the database table
+          // Database users table is empty; populate all default personas into the database table
           ensureDefaultUsersInSupabase().then(() => pullCloudChanges(true)).catch(() => {});
         }
 
@@ -1375,8 +1388,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { success: false, error: 'Please enter your account password.' };
     }
 
-    // Match by username, email, full name, or email username prefix
-    const matchedUser = users.find(u => {
+    // Match against active users and fall back to INITIAL_USERS so default personas always succeed
+    const candidatePool = [
+      ...users,
+      ...INITIAL_USERS.filter(iu => !users.some(u => u.id === iu.id || u.email.toLowerCase() === iu.email.toLowerCase()))
+    ];
+
+    const matchedUser = candidatePool.find(u => {
       const emailLower = u.email.toLowerCase();
       const usernameLower = (u.username || u.email.split('@')[0]).toLowerCase();
       const nameLower = u.name.toLowerCase();
@@ -1388,8 +1406,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         emailPrefix === rawInput ||
         ((rawInput === 'shreyasjadhav@gmail.com' || rawInput === 'shreyasjadhav' || rawInput === 'shreyas') && u.id === 'user-1') ||
         ((rawInput === 'sahilparbale@gmail.com' || rawInput === 'sahil' || rawInput === 'sahilparbale') && (u.id === 'user-2' || u.name.includes('Sahil'))) ||
-        ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || u.name.includes('Priya'))) ||
-        ((rawInput === 'aarav.mehta@taskflow.io' || rawInput === 'aarav') && (u.id === 'user-marketing-emp' || u.name.includes('Aarav')))
+        ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || u.name.includes('Priya') || u.email.includes('priya'))) ||
+        ((rawInput === 'aarav.mehta@taskflow.io' || rawInput === 'aarav') && (u.id === 'user-marketing-emp' || u.name.includes('Aarav') || u.email.includes('aarav')))
       );
     });
 
@@ -1398,6 +1416,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         success: false,
         error: `No account found for "${usernameOrEmail}". Try Shreyas Jadhav (shreyasjadhav@gmail.com) for Software or Priya Sharma (priya.marketing@taskflow.io) for Marketing.`
       };
+    }
+
+    // Ensure matched user is present in memory and persisted in Supabase
+    if (!users.some(u => u.id === matchedUser.id)) {
+      setUsers(prev => [...prev, matchedUser]);
+      upsertUserToSupabase(matchedUser).catch(() => {});
     }
 
     // Check password
