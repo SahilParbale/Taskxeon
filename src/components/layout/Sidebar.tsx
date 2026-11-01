@@ -120,7 +120,7 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
     {
       id: 'projects',
       label: currentUser.department && currentUser.department.toLowerCase().includes('market')
-        ? (currentUser.role === 'employee' ? 'My Campaigns' : 'Campaigns')
+        ? (currentUser.role === 'employee' ? 'My Products' : 'Products')
         : (currentUser.role === 'employee' ? 'My Projects' : 'Projects'),
       icon: <FolderKanban className="w-4 h-4" />,
       badge: (currentUser.role === 'employee'

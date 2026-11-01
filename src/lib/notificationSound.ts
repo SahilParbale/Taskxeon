@@ -8,8 +8,12 @@ class SoundManager {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('taskflow_sound_enabled');
-      this.soundEnabled = saved !== null ? saved === 'true' : true;
+      try {
+        const saved = sessionStorage.getItem('taskflow_sound_enabled');
+        this.soundEnabled = saved !== null ? saved === 'true' : true;
+      } catch {
+        this.soundEnabled = true;
+      }
     }
   }
 
@@ -38,7 +42,11 @@ class SoundManager {
   public setSoundEnabled(enabled: boolean) {
     this.soundEnabled = enabled;
     if (typeof window !== 'undefined') {
-      localStorage.setItem('taskflow_sound_enabled', String(enabled));
+      try {
+        sessionStorage.setItem('taskflow_sound_enabled', String(enabled));
+      } catch {
+        // ignore
+      }
     }
   }
 

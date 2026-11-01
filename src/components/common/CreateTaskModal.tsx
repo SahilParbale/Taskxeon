@@ -309,15 +309,15 @@ export const CreateTaskModal: React.FC = () => {
               />
             </div>
 
-            {/* Associated Campaign / Project */}
+            {/* Associated Product / Project */}
             <div>
               <label htmlFor="task-project" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1">
                   <FolderKanban className="w-3.5 h-3.5 text-slate-500" />
-                  {isMarketing ? 'Associated Campaign' : 'Associated Project'}
+                  {isMarketing ? 'Target Product' : 'Associated Project'}
                 </span>
                 <span className="text-[10px] text-emerald-700 font-semibold lowercase">
-                  (reflects live on {isMarketing ? 'campaign' : 'project'} page)
+                  (reflects live on {isMarketing ? 'product' : 'project'} page)
                 </span>
               </label>
               <CustomSelect
@@ -326,7 +326,7 @@ export const CreateTaskModal: React.FC = () => {
                 className="w-full"
                 buttonClassName="w-full py-2.5 px-3.5 text-xs sm:text-sm font-medium"
                 options={[
-                  { value: '', label: isMarketing ? 'No Campaign (Independent Lead)' : 'No Project (Standalone Task)' },
+                  { value: '', label: isMarketing ? 'No Product (Independent Lead)' : 'No Project (Standalone Task)' },
                   ...projects.map(p => ({
                     value: p.id,
                     label: `[${p.key}] ${p.name}`

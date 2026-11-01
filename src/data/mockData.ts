@@ -71,9 +71,9 @@ export const INITIAL_PROJECTS: Project[] = [
   },
   {
     id: 'proj-mkt-1',
-    name: 'Q4 Product Launch Campaign',
-    key: 'MKT',
-    description: 'Digital brand awareness, SEO positioning, newsletter launches, and ad creatives.',
+    name: 'Taskflow Cloud CRM & ERP Suite',
+    key: 'CRM',
+    description: 'Enterprise commercial product. Field sales and outreach representatives track client calls, on-site meetings, live demos, and deal closures.',
     health: 'on_track',
     deadline: '2026-12-31',
     members: ['user-marketing-mgr', 'user-marketing-emp'],

@@ -140,19 +140,23 @@ export const GlobalSearchModal: React.FC<{ isOpen: boolean; onClose: () => void 
                     key={p.id}
                     onClick={() => {
                       setSelectedProjectId(p.id);
-                      setCurrentView('project_detail');
+                      setCurrentView('projects');
                       onClose();
                     }}
                     className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 cursor-pointer group transition-colors"
                   >
                     <div className="flex items-center gap-2.5">
-                      <Folder className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                      <Folder className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                       <div>
                         <span className="text-xs font-semibold text-slate-800">
                           [{p.key}] {p.name}
                         </span>
                         <span className="text-[11px] text-slate-400 ml-2">
-                          {p.progress}% • {p.health.replace('_', ' ').toUpperCase()}
+                          {(currentUser.department && currentUser.department.toLowerCase().includes('market')) ||
+                          (p.department && p.department.toLowerCase().includes('market')) ||
+                          p.id.includes('mkt')
+                            ? 'Sales Pipeline'
+                            : `${p.progress}% • ${p.health.replace('_', ' ').toUpperCase()}`}
                         </span>
                       </div>
                     </div>

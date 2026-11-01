@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   presence TEXT NOT NULL DEFAULT 'online',
   bio TEXT,
   phone TEXT,
+  username TEXT,
+  password TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -138,6 +140,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 -- ============================================================================
 ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS username TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password TEXT;
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS client_contact TEXT;

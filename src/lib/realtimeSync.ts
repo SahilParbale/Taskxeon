@@ -30,7 +30,6 @@ export interface SyncEvent {
 }
 
 const CHANNEL_NAME = 'taskflow_realtime_channel_v1';
-const PING_KEY = 'taskflow_realtime_ping_v1';
 
 class RealtimeSyncManager {
   private channel: BroadcastChannel | null = null;
@@ -51,20 +50,6 @@ class RealtimeSyncManager {
       } catch (err) {
         console.warn('[RealtimeSync] BroadcastChannel init warning:', err);
       }
-
-      // Storage event fallback for cross-tab sync in all browser environments
-      window.addEventListener('storage', (e: StorageEvent) => {
-        if (e.key === PING_KEY && e.newValue) {
-          try {
-            const parsed: SyncEvent = JSON.parse(e.newValue);
-            if (parsed && parsed.senderId !== this.clientId) {
-              this.notifyListeners(parsed);
-            }
-          } catch {
-            // ignore JSON parse error
-          }
-        }
-      });
     }
   }
 
@@ -109,14 +94,7 @@ class RealtimeSyncManager {
       }
     }
 
-    // 2. Trigger localStorage storage event fallback
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(PING_KEY, JSON.stringify(event));
-      } catch {
-        // storage quota or private browsing safeguard
-      }
-    }
+    // BroadcastChannel delivers instant < 5ms cross-tab delivery without writing to disk or localStorage
   }
 }
 

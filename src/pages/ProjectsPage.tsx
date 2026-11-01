@@ -19,7 +19,8 @@ import {
   Search,
   PhoneCall,
   MapPin,
-  Phone
+  Phone,
+  Trash2
 } from 'lucide-react';
 
 export const ProjectsPage: React.FC = () => {
@@ -36,7 +37,8 @@ export const ProjectsPage: React.FC = () => {
     setIsCreateProjectModalOpen,
     setIsCreateModalOpen,
     updateTaskStatus,
-    activities
+    activities,
+    deleteProject
   } = useApp();
 
   const isMarketing = !!(currentUser.department && currentUser.department.toLowerCase().includes('market'));
@@ -147,6 +149,33 @@ export const ProjectsPage: React.FC = () => {
       a => a.type === 'project' && a.target.includes(selectedProject.name)
     );
 
+    const isProjectMarketing =
+      isMarketing ||
+      (selectedProject.department && selectedProject.department.toLowerCase().includes('market')) ||
+      selectedProject.id.includes('mkt');
+
+    // For this respective product:
+    // 1. Calls:
+    const callsInProgress = projectTasks.filter(t => t.status === 'calling' || t.status === 'todo');
+    const callsDone = projectTasks.filter(t => t.status !== 'calling' && t.status !== 'todo');
+    const totalCalls = projectTasks.length;
+
+    // 2. Field Visits:
+    const visitsInProgress = projectTasks.filter(t => t.status === 'field_visit' || t.status === 'in_progress');
+    const visitsDone = projectTasks.filter(t => t.status === 'demo' || t.status === 'blocked' || t.status === 'completed');
+    const totalVisits = visitsInProgress.length + visitsDone.length;
+
+    // 3. Product Demos:
+    const demosInProgress = projectTasks.filter(t => t.status === 'demo' || t.status === 'blocked');
+    const demosDone = projectTasks.filter(t => t.status === 'completed');
+    const totalDemos = demosInProgress.length + demosDone.length;
+
+    // 4. Closed Won:
+    const closedLeads = projectTasks.filter(t => t.status === 'completed');
+    const totalLeads = projectTasks.length;
+    const conversionRate = totalLeads > 0 ? Math.round((closedLeads.length / totalLeads) * 100) : 0;
+    const pipelineActive = totalLeads - closedLeads.length;
+
     const currentDisplayProgress = sliderValue !== null ? sliderValue : selectedProject.progress;
 
     const handleSliderCommit = (val: number) => {
@@ -165,7 +194,7 @@ export const ProjectsPage: React.FC = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-emerald-700 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to all projects
+          {isProjectMarketing ? 'Back to all products' : 'Back to all projects'}
         </button>
 
         {/* Project Header Banner */}
@@ -176,7 +205,14 @@ export const ProjectsPage: React.FC = () => {
                 <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
                   {selectedProject.key}
                 </span>
-                {getHealthBadge(selectedProject.health)}
+                {isProjectMarketing ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                    Commercial Product Line
+                  </span>
+                ) : (
+                  getHealthBadge(selectedProject.health)
+                )}
               </div>
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                 {selectedProject.name}
@@ -186,190 +222,484 @@ export const ProjectsPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
-              <Clock className="w-4 h-4 text-emerald-600" />
-              <span>
-                Last updated by{' '}
-                <strong className="text-slate-800">
-                  {selectedProject.lastUpdatedBy || 'Team member'}
-                </strong>{' '}
-                ({selectedProject.lastUpdatedAt || 'Recently'})
-              </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+                <Clock className="w-4 h-4 text-emerald-600" />
+                <span>
+                  Last updated by{' '}
+                  <strong className="text-slate-800">
+                    {selectedProject.lastUpdatedBy || 'Team member'}
+                  </strong>{' '}
+                  ({selectedProject.lastUpdatedAt || 'Recently'})
+                </span>
+              </div>
+
+              {currentUser.role === 'manager' && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete ${isProjectMarketing ? 'product' : 'project'} "${selectedProject.name}"? Only managers can perform this action.`)) {
+                      deleteProject(selectedProject.id);
+                      setSelectedProjectId(null);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-semibold transition-colors cursor-pointer"
+                  title={isProjectMarketing ? 'Delete Product (Manager Only)' : 'Delete Project (Manager Only)'}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>{isProjectMarketing ? 'Delete Product' : 'Delete Project'}</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* KPI Strip */}
-          <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {/* Current Progress KPI */}
-            <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
-              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                Current Progress
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-3xl font-extrabold text-emerald-900 tabular-nums">
-                  {selectedProject.progress}%
-                </span>
-                <span className="text-xs font-semibold text-emerald-700">Manual Status</span>
+          {isProjectMarketing ? (
+            <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Calling & Outreach KPI */}
+              <div className="p-4 bg-sky-50/60 rounded-xl border border-sky-100 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-sky-800 uppercase tracking-wider block">
+                    Product Outreach Calls
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold text-sky-950 tabular-nums">
+                      {totalCalls}
+                    </span>
+                    <span className="text-xs font-semibold text-sky-700">Total Calls</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                      {callsDone.length} Done
+                    </span>
+                    <span className="text-[11px] font-bold text-sky-800 bg-sky-100/90 px-2 py-0.5 rounded-md">
+                      {callsInProgress.length} In Progress
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-sky-600 mt-2.5 flex items-center gap-1">
+                  <PhoneCall className="w-3 h-3" />
+                  Initial qualification calls
+                </p>
+              </div>
+
+              {/* Field Visits KPI */}
+              <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-100 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
+                    On-Site Field Visits
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold text-amber-950 tabular-nums">
+                      {totalVisits}
+                    </span>
+                    <span className="text-xs font-semibold text-amber-700">Visits</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                      {visitsDone.length} Done
+                    </span>
+                    <span className="text-[11px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md">
+                      {visitsInProgress.length} In Progress
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-amber-600 mt-2.5 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  Corporate client visits
+                </p>
+              </div>
+
+              {/* Product Demos KPI */}
+              <div className="p-4 bg-purple-50/60 rounded-xl border border-purple-100 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider block">
+                    Product Demonstrations
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold text-purple-950 tabular-nums">
+                      {totalDemos}
+                    </span>
+                    <span className="text-xs font-semibold text-purple-700">Demos</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                      {demosDone.length} Done
+                    </span>
+                    <span className="text-[11px] font-bold text-purple-800 bg-purple-100/90 px-2 py-0.5 rounded-md">
+                      {demosInProgress.length} In Progress
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-purple-600 mt-2.5 flex items-center gap-1">
+                  <CheckSquare className="w-3 h-3" />
+                  Live solution pitches
+                </p>
+              </div>
+
+              {/* Closed Won / Converted Deals KPI */}
+              <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-100 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                    Deals Closed & Won
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold text-emerald-950 tabular-nums">
+                      {closedLeads.length}
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-700 font-bold">
+                      {conversionRate}% Win Rate
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                      {closedLeads.length} Won
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                      {pipelineActive} In Pipeline
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-emerald-700 mt-2.5 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Finalized customer contracts
+                </p>
               </div>
             </div>
-
-            {/* Target Deadline */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Target Deadline
-              </span>
-              <p className="text-sm font-bold text-slate-800 mt-1 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-emerald-600" />
-                {selectedProject.deadline}
-              </p>
-            </div>
-
-            {/* Team Size */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Assigned Team
-              </span>
-              <p className="text-sm font-bold text-slate-800 mt-1 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-emerald-600" />
-                {projectMembers.length} Members
-              </p>
-            </div>
-
-            {/* Linked Tasks KPI */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Project Deliverables
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-bold text-slate-900 tabular-nums">
-                  {completedProjectTasks.length}/{projectTasks.length}
+          ) : (
+            <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Current Progress KPI */}
+              <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                  Current Progress
                 </span>
-                <span className="text-xs font-semibold text-emerald-700">Tasks Done</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-emerald-900 tabular-nums">
+                    {selectedProject.progress}%
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-700">Manual Status</span>
+                </div>
+              </div>
+
+              {/* Target Deadline */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Target Deadline
+                </span>
+                <p className="text-sm font-bold text-slate-800 mt-1 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  {selectedProject.deadline}
+                </p>
+              </div>
+
+              {/* Team Size */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Assigned Team
+                </span>
+                <p className="text-sm font-bold text-slate-800 mt-1 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-emerald-600" />
+                  {projectMembers.length} Members
+                </p>
+              </div>
+
+              {/* Linked Tasks KPI */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Project Deliverables
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                    {completedProjectTasks.length}/{projectTasks.length}
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-700">Tasks Done</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Manual Progress Station & Health Control */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-emerald-600" />
-                <h2 className="text-base font-bold text-slate-900">
-                  Manual Progress & Health Controls
-                </h2>
+        {/* Dynamic Station: Product Sales Outreach Tracker for Marketing vs Manual Progress & Health for Engineering */}
+        {isProjectMarketing ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <PhoneCall className="w-4 h-4 text-emerald-600" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    Product Sales & Demonstration Pipeline
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Live client engagement tracking for {selectedProject.name}: calls, visits, demos done and in progress.
+                </p>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Each employee and manager can manually update completion percentage and health status.
-              </p>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                  {totalLeads} Total Accounts • {closedLeads.length} Won ({conversionRate}%)
+                </span>
+                {currentUser.role === 'manager' && (
+                  <button
+                    onClick={() => {
+                      setSelectedProjectId(selectedProject.id);
+                      setIsCreateModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Schedule Call / Visit</span>
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 font-medium">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Decoupled from independent tasks</span>
+            {/* Product Sales Pipeline Velocity Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-baseline text-xs">
+                <span className="font-bold text-slate-700 uppercase tracking-wider">
+                  Product Sales Velocity & Stage Distribution
+                </span>
+                <span className="font-semibold text-slate-500">
+                  {closedLeads.length} of {totalLeads} accounts successfully converted
+                </span>
+              </div>
+
+              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden flex">
+                {totalLeads === 0 ? (
+                  <div className="w-full bg-slate-200 h-full" />
+                ) : (
+                  <>
+                    <div
+                      style={{ width: `${(callsInProgress.length / totalLeads) * 100}%` }}
+                      className="bg-sky-500 h-full transition-all duration-300"
+                      title={`Calls In Progress: ${callsInProgress.length}`}
+                    />
+                    <div
+                      style={{ width: `${(visitsInProgress.length / totalLeads) * 100}%` }}
+                      className="bg-amber-500 h-full transition-all duration-300"
+                      title={`Field Visits In Progress: ${visitsInProgress.length}`}
+                    />
+                    <div
+                      style={{ width: `${(demosInProgress.length / totalLeads) * 100}%` }}
+                      className="bg-purple-500 h-full transition-all duration-300"
+                      title={`Product Demos In Progress: ${demosInProgress.length}`}
+                    />
+                    <div
+                      style={{ width: `${(closedLeads.length / totalLeads) * 100}%` }}
+                      className="bg-emerald-600 h-full transition-all duration-300"
+                      title={`Closed Won Deals: ${closedLeads.length}`}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* Legend with Done vs In Progress info */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-600 pt-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+                  <span>Calls: <strong className="text-slate-900">{callsDone.length} Done</strong>, {callsInProgress.length} in prog</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  <span>Visits: <strong className="text-slate-900">{visitsDone.length} Done</strong>, {visitsInProgress.length} in prog</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                  <span>Demos: <strong className="text-slate-900">{demosDone.length} Done</strong>, {demosInProgress.length} in prog</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                  <span>Won: <strong className="text-slate-900">{closedLeads.length} Closed Deals</strong></span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Interactive Range Slider */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-baseline">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Adjust Progress Slider
-              </span>
-              <span className="text-2xl font-extrabold text-emerald-800 tabular-nums">
-                {currentDisplayProgress}%
-              </span>
-            </div>
+            {/* Stage Breakdown Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
+              {[
+                { stage: 'calling', title: 'Calling & Qualification', color: 'border-sky-200 bg-sky-50/30', badgeColor: 'bg-sky-100 text-sky-800', leads: callsInProgress, statusBadge: `${callsDone.length} Done` },
+                { stage: 'field_visit', title: 'On-Site Field Visits', color: 'border-amber-200 bg-amber-50/30', badgeColor: 'bg-amber-100 text-amber-800', leads: visitsInProgress, statusBadge: `${visitsDone.length} Done` },
+                { stage: 'demo', title: 'Product Demonstrations', color: 'border-purple-200 bg-purple-50/30', badgeColor: 'bg-purple-100 text-purple-800', leads: demosInProgress, statusBadge: `${demosDone.length} Done` },
+                { stage: 'completed', title: 'Closed Won Deals', color: 'border-emerald-200 bg-emerald-50/30', badgeColor: 'bg-emerald-100 text-emerald-800', leads: closedLeads, statusBadge: `${conversionRate}% Rate` }
+              ].map(col => (
+                <div key={col.stage} className={`p-3.5 rounded-xl border ${col.color} flex flex-col justify-between space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">{col.title}</span>
+                      <span className="text-[10px] text-slate-500">{col.statusBadge}</span>
+                    </div>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${col.badgeColor}`}>
+                      {col.leads.length} Active
+                    </span>
+                  </div>
 
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={currentDisplayProgress}
-              onChange={e => setSliderValue(Number(e.target.value))}
-              onMouseUp={e => handleSliderCommit(Number((e.target as HTMLInputElement).value))}
-              onTouchEnd={e => handleSliderCommit(Number((e.target as HTMLInputElement).value))}
-              className="w-full h-3 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-600 transition-all"
-            />
-
-            <div className="flex justify-between text-[10px] sm:text-[11px] font-semibold text-slate-400 px-1">
-              <span><span className="hidden sm:inline">0% </span>Kickoff</span>
-              <span>25%<span className="hidden sm:inline"> Planning</span></span>
-              <span>50%<span className="hidden sm:inline"> In Flight</span></span>
-              <span>75%<span className="hidden sm:inline"> Testing</span></span>
-              <span>100%<span className="hidden sm:inline"> Done</span></span>
-            </div>
-          </div>
-
-          {/* Quick Adjustment Stepper Buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <span className="text-xs font-semibold text-slate-500 mr-1">Quick Nudge:</span>
-            {[-10, -5, +5, +10].map(delta => (
-              <button
-                key={delta}
-                onClick={() =>
-                  updateProjectProgress(
-                    selectedProject.id,
-                    Math.min(100, Math.max(0, selectedProject.progress + delta))
-                  )
-                }
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-all active:scale-95"
-              >
-                {delta > 0 ? `+${delta}%` : `${delta}%`}
-              </button>
-            ))}
-
-            <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
-
-            <span className="text-xs font-semibold text-slate-500 mr-1 hidden sm:inline">Set Stage:</span>
-            {[25, 50, 75, 100].map(target => (
-              <button
-                key={target}
-                onClick={() => updateProjectProgress(selectedProject.id, target)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${
-                  selectedProject.progress === target
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-                }`}
-              >
-                {target}% {target === 100 ? 'Live' : ''}
-              </button>
-            ))}
-          </div>
-
-          {/* Project Health Selector */}
-          <div className="pt-4 border-t border-slate-100 space-y-2">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-              Update Health Status
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              {(
-                [
-                  { id: 'on_track', label: 'On Track', desc: 'Progress advancing smoothly', color: 'bg-emerald-600' },
-                  { id: 'at_risk', label: 'At Risk', desc: 'Blockers or upcoming deadline risk', color: 'bg-amber-600' },
-                  { id: 'behind', label: 'Behind', desc: 'Critical delay needing intervention', color: 'bg-rose-600' }
-                ] as const
-              ).map(st => (
-                <button
-                  key={st.id}
-                  onClick={() =>
-                    updateProjectProgress(selectedProject.id, selectedProject.progress, st.id)
-                  }
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all ${
-                    selectedProject.health === st.id
-                      ? 'border-slate-800 bg-slate-900 text-white shadow-sm ring-1 ring-slate-800'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${st.color}`} />
-                  <span>{st.label}</span>
-                </button>
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {col.leads.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 italic py-3 text-center">No accounts in this stage</p>
+                    ) : (
+                      col.leads.map(lead => (
+                        <div
+                          key={lead.id}
+                          onClick={() => setSelectedTaskId(lead.id)}
+                          className="p-2.5 bg-white rounded-lg border border-slate-200 shadow-2xs hover:border-emerald-400 cursor-pointer transition-all space-y-1"
+                        >
+                          <p className="text-xs font-bold text-slate-900 line-clamp-1">{lead.title}</p>
+                          {lead.clientContact && (
+                            <p className="text-[10px] text-slate-600 flex items-center gap-1 truncate">
+                              <Users className="w-2.5 h-2.5 text-slate-400 flex-shrink-0" />
+                              <span className="truncate">{lead.clientContact}</span>
+                            </p>
+                          )}
+                          {lead.clientLocation && (
+                            <p className="text-[10px] text-slate-500 flex items-center gap-1 truncate">
+                              <MapPin className="w-2.5 h-2.5 text-slate-400 flex-shrink-0" />
+                              <span className="truncate">{lead.clientLocation}</span>
+                            </p>
+                          )}
+                          {lead.clientPhone && (
+                            <p className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 truncate">
+                              <Phone className="w-2.5 h-2.5 text-emerald-600 flex-shrink-0" />
+                              <span className="truncate">{lead.clientPhone}</span>
+                            </p>
+                          )}
+                          {lead.stageOutcome && (
+                            <p className="text-[10px] text-slate-700 bg-slate-50 p-1 rounded border border-slate-100 italic line-clamp-1">
+                              "{lead.stageOutcome}"
+                            </p>
+                          )}
+                          <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100">
+                            <span>{lead.dueDate}</span>
+                            <span className="capitalize font-semibold text-slate-600">{lead.priority}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-emerald-600" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    Manual Progress & Health Controls
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Each employee and manager can manually update completion percentage and health status.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 font-medium">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Decoupled from independent tasks</span>
+              </div>
+            </div>
+
+            {/* Interactive Range Slider */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-baseline">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Adjust Progress Slider
+                </span>
+                <span className="text-2xl font-extrabold text-emerald-800 tabular-nums">
+                  {currentDisplayProgress}%
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={currentDisplayProgress}
+                onChange={e => setSliderValue(Number(e.target.value))}
+                onMouseUp={e => handleSliderCommit(Number((e.target as HTMLInputElement).value))}
+                onTouchEnd={e => handleSliderCommit(Number((e.target as HTMLInputElement).value))}
+                className="w-full h-3 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-600 transition-all"
+              />
+
+              <div className="flex justify-between text-[10px] sm:text-[11px] font-semibold text-slate-400 px-1">
+                <span><span className="hidden sm:inline">0% </span>Kickoff</span>
+                <span>25%<span className="hidden sm:inline"> Planning</span></span>
+                <span>50%<span className="hidden sm:inline"> In Flight</span></span>
+                <span>75%<span className="hidden sm:inline"> Testing</span></span>
+                <span>100%<span className="hidden sm:inline"> Done</span></span>
+              </div>
+            </div>
+
+            {/* Quick Adjustment Stepper Buttons */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <span className="text-xs font-semibold text-slate-500 mr-1">Quick Nudge:</span>
+              {[-10, -5, +5, +10].map(delta => (
+                <button
+                  key={delta}
+                  onClick={() =>
+                    updateProjectProgress(
+                      selectedProject.id,
+                      Math.min(100, Math.max(0, selectedProject.progress + delta))
+                    )
+                  }
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-all active:scale-95"
+                >
+                  {delta > 0 ? `+${delta}%` : `${delta}%`}
+                </button>
+              ))}
+
+              <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+
+              <span className="text-xs font-semibold text-slate-500 mr-1 hidden sm:inline">Set Stage:</span>
+              {[25, 50, 75, 100].map(target => (
+                <button
+                  key={target}
+                  onClick={() => updateProjectProgress(selectedProject.id, target)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${
+                    selectedProject.progress === target
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  {target}% {target === 100 ? 'Live' : ''}
+                </button>
+              ))}
+            </div>
+
+            {/* Project Health Selector */}
+            <div className="pt-4 border-t border-slate-100 space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                Update Health Status
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                {(
+                  [
+                    { id: 'on_track', label: 'On Track', desc: 'Progress advancing smoothly', color: 'bg-emerald-600' },
+                    { id: 'at_risk', label: 'At Risk', desc: 'Blockers or upcoming deadline risk', color: 'bg-amber-600' },
+                    { id: 'behind', label: 'Behind', desc: 'Critical delay needing intervention', color: 'bg-rose-600' }
+                  ] as const
+                ).map(st => (
+                  <button
+                    key={st.id}
+                    onClick={() =>
+                      updateProjectProgress(selectedProject.id, selectedProject.progress, st.id)
+                    }
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                      selectedProject.health === st.id
+                        ? 'border-slate-800 bg-slate-900 text-white shadow-sm ring-1 ring-slate-800'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${st.color}`} />
+                    <span>{st.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Two Columns: Project Deliverables & Team Members */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -379,7 +709,7 @@ export const ProjectsPage: React.FC = () => {
               <div className="flex items-center gap-2 flex-wrap">
                 {isMarketing ? <PhoneCall className="w-4 h-4 text-emerald-600" /> : <CheckSquare className="w-4 h-4 text-emerald-600" />}
                 <h3 className="text-sm font-bold text-slate-900">
-                  {isMarketing ? `Campaign Leads & Engagements (${projectTasks.length})` : `Project Tasks & Deliverables (${projectTasks.length})`}
+                  {isMarketing ? `Product Client Accounts (${projectTasks.length})` : `Project Tasks & Deliverables (${projectTasks.length})`}
                 </h3>
                 <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                   {completedProjectTasks.length} / {projectTasks.length} {isMarketing ? 'converted' : 'completed'}
@@ -395,7 +725,7 @@ export const ProjectsPage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all self-start sm:self-auto cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{isMarketing ? 'Schedule Lead' : 'Assign Task'}</span>
+                  <span>{isMarketing ? 'Schedule Client Lead' : 'Assign Task'}</span>
                 </button>
               )}
             </div>
@@ -407,10 +737,10 @@ export const ProjectsPage: React.FC = () => {
                   {isMarketing ? <PhoneCall className="w-5 h-5 text-slate-400" /> : <CheckSquare className="w-5 h-5 text-slate-400" />}
                 </div>
                 <p className="text-xs text-slate-600 font-semibold">
-                  {isMarketing ? 'No client leads linked to this campaign yet.' : 'No deliverables linked to this project yet.'}
+                  {isMarketing ? 'No client accounts linked to this product yet.' : 'No deliverables linked to this project yet.'}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {isMarketing ? 'Client calls, field visits, and demos added to this campaign will be tracked here.' : 'Tasks added to this project will be tracked here in real-time.'}
+                  {isMarketing ? 'Client calls, field visits, and demos added for this product will be tracked here.' : 'Tasks added to this project will be tracked here in real-time.'}
                 </p>
                 {currentUser.role === 'manager' && (
                   <button
@@ -658,7 +988,13 @@ export const ProjectsPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {currentUser.role === 'employee' ? 'My Assigned Projects' : 'Projects'}
+              {currentUser.role === 'employee'
+                ? isMarketing
+                  ? 'My Assigned Products'
+                  : 'My Assigned Projects'
+                : isMarketing
+                ? 'Commercial Products'
+                : 'Projects'}
             </h1>
             {currentUser.role === 'employee' && (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -668,7 +1004,11 @@ export const ProjectsPage: React.FC = () => {
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             {currentUser.role === 'employee'
-              ? 'Only initiatives and deliverables you are actively assigned to contribute to.'
+              ? isMarketing
+                ? 'Commercial products and client accounts you are assigned to sell and demonstrate.'
+                : 'Only initiatives and deliverables you are actively assigned to contribute to.'
+              : isMarketing
+              ? 'Track commercial product lines, client sales outreach, demos, and closed customer contracts.'
               : 'Track strategic initiatives, manage assigned teams, and monitor deliverable execution.'}
           </p>
         </div>
@@ -705,7 +1045,7 @@ export const ProjectsPage: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search projects..."
+              placeholder={isMarketing ? 'Search products...' : 'Search projects...'}
               className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all sm:w-52 shadow-soft-sm"
             />
           </div>
@@ -716,7 +1056,7 @@ export const ProjectsPage: React.FC = () => {
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition-all flex-shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>New Project</span>
+              <span>{isMarketing ? 'New Product' : 'New Project'}</span>
             </button>
           )}
         </div>
@@ -728,14 +1068,20 @@ export const ProjectsPage: React.FC = () => {
             <FolderPlus className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-bold text-slate-900">
-            {currentUser.role === 'employee' ? 'No Assigned Projects' : 'No projects found'}
+            {currentUser.role === 'employee'
+              ? isMarketing
+                ? 'No Assigned Products'
+                : 'No Assigned Projects'
+              : isMarketing
+              ? 'No commercial products found'
+              : 'No projects found'}
           </h3>
           <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
             {searchQuery
-              ? `No active project initiatives match "${searchQuery}".`
+              ? `No active ${isMarketing ? 'commercial products' : 'project initiatives'} match "${searchQuery}".`
               : currentUser.role === 'employee'
-              ? 'You are not assigned to any project initiatives yet. Projects will automatically appear here as soon as a manager assigns you as a team contributor or assigns a project task to you.'
-              : 'No project initiatives have been registered yet.'}
+              ? `You are not assigned to any ${isMarketing ? 'commercial products' : 'project initiatives'} yet. They will automatically appear here as soon as a manager assigns you.`
+              : `No ${isMarketing ? 'commercial products' : 'project initiatives'} have been registered yet.`}
           </p>
           <div className="flex items-center justify-center gap-2">
             {searchQuery && (
@@ -751,7 +1097,7 @@ export const ProjectsPage: React.FC = () => {
                 onClick={() => setIsCreateProjectModalOpen(true)}
                 className="px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm"
               >
-                + New Project
+                {isMarketing ? '+ New Product' : '+ New Project'}
               </button>
             )}
           </div>
@@ -760,9 +1106,23 @@ export const ProjectsPage: React.FC = () => {
         /* Projects Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         {filteredProjects.map(project => {
+          const isProjMkt =
+            isMarketing ||
+            (project.department && project.department.toLowerCase().includes('market')) ||
+            project.id.includes('mkt');
           const projectMembers = users.filter(u => project.members.includes(u.id));
           const projectTasks = tasks.filter(t => t.projectId === project.id);
           const completedTasksCount = projectTasks.filter(t => t.status === 'completed').length;
+
+          // For this respective product:
+          const callsInProgress = projectTasks.filter(t => t.status === 'calling' || t.status === 'todo').length;
+          const callsDone = projectTasks.filter(t => t.status !== 'calling' && t.status !== 'todo').length;
+          const visitsInProgress = projectTasks.filter(t => t.status === 'field_visit' || t.status === 'in_progress').length;
+          const visitsDone = projectTasks.filter(t => t.status === 'demo' || t.status === 'blocked' || t.status === 'completed').length;
+          const demosInProgress = projectTasks.filter(t => t.status === 'demo' || t.status === 'blocked').length;
+          const demosDone = projectTasks.filter(t => t.status === 'completed').length;
+          const closedCount = projectTasks.filter(t => t.status === 'completed').length;
+          const convPct = projectTasks.length > 0 ? Math.round((closedCount / projectTasks.length) * 100) : 0;
 
           return (
             <div
@@ -777,7 +1137,30 @@ export const ProjectsPage: React.FC = () => {
                       {project.key}
                     </span>
                   </div>
-                  {getHealthBadge(project.health)}
+                  <div className="flex items-center gap-1.5">
+                    {isProjMkt ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                        Commercial Product
+                      </span>
+                    ) : (
+                      getHealthBadge(project.health)
+                    )}
+                    {currentUser.role === 'manager' && (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (window.confirm(`Are you sure you want to delete ${isProjMkt ? 'product' : 'project'} "${project.name}"? Only managers can perform this action.`)) {
+                            deleteProject(project.id);
+                          }
+                        }}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title={isProjMkt ? 'Delete Product (Manager Only)' : 'Delete Project (Manager Only)'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <h2 className="text-lg font-bold text-slate-900 group-hover:text-emerald-800 transition-colors mb-2">
@@ -787,72 +1170,157 @@ export const ProjectsPage: React.FC = () => {
                   {project.description}
                 </p>
 
-                {/* Live Task Deliverables Pill */}
+                {/* Live Deliverables Pill */}
                 <div className="flex items-center justify-between text-xs mb-5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100 group-hover:border-emerald-200 group-hover:bg-emerald-50/30 transition-colors">
                   <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                    <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{projectTasks.length} {projectTasks.length === 1 ? 'Task' : 'Tasks'}</span>
+                    {isProjMkt ? (
+                      <PhoneCall className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    )}
+                    <span>
+                      {projectTasks.length}{' '}
+                      {isProjMkt
+                        ? projectTasks.length === 1
+                          ? 'Client Account'
+                          : 'Client Accounts'
+                        : projectTasks.length === 1
+                        ? 'Task'
+                        : 'Tasks'}
+                    </span>
                   </div>
                   <span className="text-[11px] font-medium text-slate-500">
                     {projectTasks.length === 0
-                      ? 'No tasks assigned'
+                      ? isProjMkt
+                        ? 'No accounts assigned'
+                        : 'No tasks assigned'
+                      : isProjMkt
+                      ? `${closedCount}/${projectTasks.length} Won (${convPct}%)`
                       : `${completedTasksCount}/${projectTasks.length} done (${Math.round((completedTasksCount / projectTasks.length) * 100)}%)`}
                   </span>
                 </div>
               </div>
 
               <div>
-                {/* Manual Progress Bar with Quick Nudge Steppers */}
-                <div className="space-y-2 mb-4" onClick={e => e.stopPropagation()}>
-                  <div className="flex justify-between items-baseline text-xs">
-                    <span className="font-semibold text-slate-600">Manual Progress</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-extrabold text-emerald-800 tabular-nums text-sm">
-                        {project.progress}%
+                {isProjMkt ? (
+                  /* Marketing Product Outreach & Pipeline Velocity Tracker */
+                  <div className="space-y-2 mb-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-baseline text-xs">
+                      <span className="font-semibold text-slate-700 uppercase tracking-wider text-[11px]">
+                        Product Outreach Pipeline
                       </span>
-                      <span className="text-[10px] text-slate-400">
-                        • {project.lastUpdatedBy ? `by ${project.lastUpdatedBy.split(' ')[0]}` : 'Team'}
+                      <span className="font-extrabold text-emerald-800 tabular-nums text-xs">
+                        {closedCount} Closed Won ({convPct}%)
                       </span>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        updateProjectProgress(
-                          project.id,
-                          Math.max(0, project.progress - 5)
-                        )
-                      }
-                      disabled={project.progress <= 0}
-                      className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center transition-colors disabled:opacity-40"
-                      title="Decrease progress by 5%"
-                    >
-                      -5
-                    </button>
-
-                    <div className="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-emerald-600 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${project.progress}%` }}
-                      />
+                    {/* Segmented Pipeline Velocity Bar */}
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+                      {projectTasks.length === 0 ? (
+                        <div className="w-full bg-slate-200 h-full" />
+                      ) : (
+                        <>
+                          <div
+                            style={{ width: `${(callsInProgress / projectTasks.length) * 100}%` }}
+                            className="bg-sky-500 h-full transition-all duration-300"
+                            title={`Calls In Progress: ${callsInProgress}`}
+                          />
+                          <div
+                            style={{ width: `${(visitsInProgress / projectTasks.length) * 100}%` }}
+                            className="bg-amber-500 h-full transition-all duration-300"
+                            title={`Field Visits In Progress: ${visitsInProgress}`}
+                          />
+                          <div
+                            style={{ width: `${(demosInProgress / projectTasks.length) * 100}%` }}
+                            className="bg-purple-500 h-full transition-all duration-300"
+                            title={`Product Demos In Progress: ${demosInProgress}`}
+                          />
+                          <div
+                            style={{ width: `${(closedCount / projectTasks.length) * 100}%` }}
+                            className="bg-emerald-600 h-full transition-all duration-300"
+                            title={`Closed Won Deals: ${closedCount}`}
+                          />
+                        </>
+                      )}
                     </div>
 
-                    <button
-                      onClick={() =>
-                        updateProjectProgress(
-                          project.id,
-                          Math.min(100, project.progress + 5)
-                        )
-                      }
-                      disabled={project.progress >= 100}
-                      className="w-6 h-6 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center transition-colors disabled:opacity-40"
-                      title="Increase progress by 5%"
-                    >
-                      +5
-                    </button>
+                    {/* Stage Tallies: Done vs In Progress for this respective Product */}
+                    <div className="grid grid-cols-4 gap-1.5 text-[10px] text-center pt-1 font-semibold">
+                      <div className="bg-sky-50/80 border border-sky-100 rounded-lg py-1 px-1">
+                        <span className="text-slate-500 text-[9px] uppercase tracking-wide block">Calls</span>
+                        <span className="text-emerald-700 block text-xs font-extrabold">{callsDone} Done</span>
+                        <span className="text-sky-700 text-[9px] font-medium block">{callsInProgress} in prog</span>
+                      </div>
+                      <div className="bg-amber-50/80 border border-amber-100 rounded-lg py-1 px-1">
+                        <span className="text-slate-500 text-[9px] uppercase tracking-wide block">Visits</span>
+                        <span className="text-emerald-700 block text-xs font-extrabold">{visitsDone} Done</span>
+                        <span className="text-amber-700 text-[9px] font-medium block">{visitsInProgress} in prog</span>
+                      </div>
+                      <div className="bg-purple-50/80 border border-purple-100 rounded-lg py-1 px-1">
+                        <span className="text-slate-500 text-[9px] uppercase tracking-wide block">Demos</span>
+                        <span className="text-emerald-700 block text-xs font-extrabold">{demosDone} Done</span>
+                        <span className="text-purple-700 text-[9px] font-medium block">{demosInProgress} in prog</span>
+                      </div>
+                      <div className="bg-emerald-50/80 border border-emerald-100 rounded-lg py-1 px-1">
+                        <span className="text-slate-500 text-[9px] uppercase tracking-wide block">Won</span>
+                        <span className="text-emerald-800 block text-xs font-extrabold">{closedCount} Won</span>
+                        <span className="text-emerald-600 text-[9px] font-medium block">{convPct}% rate</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Software Engineering Manual Progress Bar with Quick Nudge Steppers */
+                  <div className="space-y-2 mb-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-baseline text-xs">
+                      <span className="font-semibold text-slate-600">Manual Progress</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-emerald-800 tabular-nums text-sm">
+                          {project.progress}%
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          • {project.lastUpdatedBy ? `by ${project.lastUpdatedBy.split(' ')[0]}` : 'Team'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          updateProjectProgress(
+                            project.id,
+                            Math.max(0, project.progress - 5)
+                          )
+                        }
+                        disabled={project.progress <= 0}
+                        className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center transition-colors disabled:opacity-40"
+                        title="Decrease progress by 5%"
+                      >
+                        -5
+                      </button>
+
+                      <div className="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-emerald-600 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${project.progress}%` }}
+                        />
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          updateProjectProgress(
+                            project.id,
+                            Math.min(100, project.progress + 5)
+                          )
+                        }
+                        disabled={project.progress >= 100}
+                        className="w-6 h-6 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center transition-colors disabled:opacity-40"
+                        title="Increase progress by 5%"
+                      >
+                        +5
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Footer: Team Avatars & Deadline */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs">

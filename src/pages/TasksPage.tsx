@@ -187,21 +187,39 @@ export const TasksPage: React.FC = () => {
     // The 2 core date filters: Due Date vs Assigned Date
     if (selectedDate !== 'all') {
       if (dateFilterMode === 'due_date') {
-        if (t.dueDate !== selectedDate) return false;
+        const matchesDueDate = t.dueDate === selectedDate;
+        let matchesCompletedDate = false;
+        if (t.completedAt) {
+          matchesCompletedDate = t.completedAt.startsWith(selectedDate);
+          if (!matchesCompletedDate) {
+            try {
+              const d = new Date(t.completedAt);
+              const y = d.getFullYear();
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              matchesCompletedDate = `${y}-${m}-${day}` === selectedDate;
+            } catch {
+              // ignore
+            }
+          }
+        }
+        if (!matchesDueDate && !matchesCompletedDate) return false;
       } else {
         // Assigned on respective date (matching t.createdAt)
         if (!t.createdAt) return false;
-        if (!t.createdAt.startsWith(selectedDate)) {
+        let matchesCreated = t.createdAt.startsWith(selectedDate);
+        if (!matchesCreated) {
           try {
             const d = new Date(t.createdAt);
             const y = d.getFullYear();
             const m = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
-            if (`${y}-${m}-${day}` !== selectedDate) return false;
+            matchesCreated = `${y}-${m}-${day}` === selectedDate;
           } catch {
             return false;
           }
         }
+        if (!matchesCreated) return false;
       }
     }
 
@@ -416,14 +434,14 @@ export const TasksPage: React.FC = () => {
             }
           />
 
-          {/* Project / Campaign Filter */}
+          {/* Product / Project Filter */}
           {projects.length > 0 && (
             <CustomSelect
               icon={<Folder className="w-3.5 h-3.5" />}
               value={selectedProjectFilter}
               onChange={val => setSelectedProjectFilter(val)}
               options={[
-                { value: 'all', label: isMarketing ? 'All Campaigns' : 'All Projects' },
+                { value: 'all', label: isMarketing ? 'All Products' : 'All Projects' },
                 ...projects
                   .filter(p => currentUser.role === 'manager' || p.members.includes(currentUser.id))
                   .map(p => ({
@@ -602,7 +620,7 @@ export const TasksPage: React.FC = () => {
                               {project && (
                                 <span
                                   className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
-                                  title={`${isMarketing ? 'Campaign' : 'Project'}: ${project.name}`}
+                                  title={`${isMarketing ? 'Product' : 'Project'}: ${project.name}`}
                                 >
                                   {project.key}
                                 </span>

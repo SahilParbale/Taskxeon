@@ -116,7 +116,7 @@ export async function fetchProjectsFromSupabase(): Promise<Project[] | null> {
         row.id === 'proj-mkt-1' ||
         String(row.id).includes('mkt') ||
         row.key === 'MKT' ||
-        (row.name && (row.name.toLowerCase().includes('marketing') || row.name.toLowerCase().includes('campaign') || row.name.toLowerCase().includes('launch'))) ||
+        (row.name && (row.name.toLowerCase().includes('marketing') || row.name.toLowerCase().includes('campaign') || row.name.toLowerCase().includes('product') || row.name.toLowerCase().includes('crm') || row.name.toLowerCase().includes('launch'))) ||
         (row.department && row.department.toLowerCase().includes('market'));
 
       return {
@@ -188,6 +188,17 @@ export async function upsertProjectToSupabase(project: Project): Promise<boolean
 
 export async function deleteProjectFromSupabase(projectId: string): Promise<boolean> {
   try {
+    // 1. Clear project_id from tasks referencing this project so foreign keys don't block deletion
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/tasks?project_id=eq.${encodeURIComponent(projectId)}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ project_id: null })
+      });
+    } catch {
+      // ignore
+    }
+
     const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${encodeURIComponent(projectId)}`, {
       method: 'DELETE',
       headers: getHeaders()
@@ -240,11 +251,15 @@ export async function fetchTasksFromSupabase(): Promise<Task[] | null> {
         (row.department && row.department.toLowerCase().includes('market')) ||
         hasMarketingTag;
 
-      // If DB status was constrained to todo/in_progress, restore marketing stage from embedded stage tag
+      // If DB status is completed or completed_at is set, the task is permanently completed in the database!
       let resolvedStatus: TaskStatus = row.status || (isMkt ? 'calling' : 'todo');
-      const stageTag = tags.find((tg: string) => typeof tg === 'string' && tg.startsWith('stage:'));
-      if (stageTag) {
-        resolvedStatus = stageTag.slice('stage:'.length) as TaskStatus;
+      if (row.status === 'completed' || row.completed_at) {
+        resolvedStatus = 'completed';
+      } else {
+        const stageTag = tags.find((tg: string) => typeof tg === 'string' && tg.startsWith('stage:'));
+        if (stageTag) {
+          resolvedStatus = stageTag.slice('stage:'.length) as TaskStatus;
+        }
       }
 
       // Extract client details from metadata tags if row columns are null
@@ -478,6 +493,8 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
       id: user.id,
       name: user.name,
       email: user.email,
+      username: user.username || (user.email ? user.email.split('@')[0] : user.id),
+      password: user.password || 'password123',
       role: user.role,
       avatar: user.avatar,
       title: user.title,
@@ -495,7 +512,7 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
 
     if (!res.ok) {
       // Fallback: Strip optional columns if not in users table schema
-      const { department, phone, bio, ...basicUserPayload } = payload;
+      const { username, password, department, phone, bio, ...basicUserPayload } = payload;
       res = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
         method: 'POST',
         headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
@@ -512,12 +529,18 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
 
 export async function deleteUserFromSupabase(userId: string, email?: string): Promise<boolean> {
   try {
-    // 1. Reassign any tasks assigned to this user to manager (user-1) so foreign keys/references don't block deletion
+    // 1. Reassign any tasks assigned to this user to department manager so foreign keys/references don't block deletion
+    const isMarketingUser =
+      userId.includes('mkt') ||
+      userId === 'user-marketing-emp' ||
+      (email && (email.includes('market') || email.includes('aarav') || email.includes('priya')));
+    const fallbackManagerId = isMarketingUser ? 'user-marketing-mgr' : 'user-1';
+
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/tasks?assignee_id=eq.${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         headers: getHeaders(),
-        body: JSON.stringify({ assignee_id: 'user-1' })
+        body: JSON.stringify({ assignee_id: fallbackManagerId })
       });
     } catch {
       // ignore

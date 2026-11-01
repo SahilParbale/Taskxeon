@@ -427,7 +427,7 @@ export const TaskDetailModal: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {isMarketing ? 'Associated Campaign' : 'Associated Project'}
+                    {isMarketing ? 'Target Product' : 'Associated Project'}
                   </label>
                   <CustomSelect
                     value={editProjectId}
@@ -435,7 +435,7 @@ export const TaskDetailModal: React.FC = () => {
                     className="w-full"
                     buttonClassName="w-full"
                     options={[
-                      { value: '', label: isMarketing ? 'No Campaign (Independent Lead)' : 'No Project (Standalone Task)' },
+                      { value: '', label: isMarketing ? 'No Product (Independent Lead)' : 'No Project (Standalone Task)' },
                       ...projects.map(p => ({
                         value: p.id,
                         label: `[${p.key}] ${p.name}`

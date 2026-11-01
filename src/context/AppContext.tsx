@@ -137,6 +137,7 @@ interface AppContextType {
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
+  deleteProject: (projectId: string) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   sendNotification: (title: string, message: string, tone?: 'chime' | 'ring' | 'success' | 'message') => void;
@@ -184,25 +185,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     deletedTaskIdsRef.current = deletedTaskIds;
   }, [deletedTaskIds]);
 
-  // Purge any legacy cached business data from browser localStorage to enforce pure cloud DB
+  const [deletedProjectIds, setDeletedProjectIds] = useState<string[]>([]);
+  const deletedProjectIdsRef = useRef(deletedProjectIds);
+  useEffect(() => {
+    deletedProjectIdsRef.current = deletedProjectIds;
+  }, [deletedProjectIds]);
+
+  // Complete Zero-LocalStorage Policy:
+  // Purge ALL browser localStorage keys so that nothing is ever stored or cached locally.
+  // All business entities (users, marketing leads, tasks, projects, activities, messages)
+  // live 100% on Supabase PostgreSQL.
   useEffect(() => {
     try {
-      const keysToPurge = [
-        `${STORAGE_KEY}_users`,
-        `${STORAGE_KEY}_projects`,
-        `${STORAGE_KEY}_tasks`,
-        `${STORAGE_KEY}_notifications`,
-        `${STORAGE_KEY}_activities`,
-        `${STORAGE_KEY}_messages`,
-        `${STORAGE_KEY}_deleted_user_ids`,
-        'taskflow_v1_users',
-        'taskflow_v2_users',
-        'taskflow_v3_users',
-        'taskflow_users'
-      ];
-      keysToPurge.forEach(k => localStorage.removeItem(k));
+      localStorage.clear();
     } catch (e) {
-      console.warn('Error purging legacy localStorage keys', e);
+      console.warn('Error clearing localStorage', e);
     }
 
     // Ensure all default personas (Software + Marketing) are present in Supabase on startup
@@ -214,7 +211,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_currentUserId`);
+      const saved = sessionStorage.getItem(`${STORAGE_KEY}_currentUserId`);
       return saved || 'user-1'; // Default Shreyas Jadhav (Manager)
     } catch {
       return 'user-1';
@@ -259,10 +256,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Authentication state - checks local storage, defaults to false to present professional login
+  // Authentication state - checks session storage, defaults to false to present professional login
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_is_authenticated`);
+      const saved = sessionStorage.getItem(`${STORAGE_KEY}_is_authenticated`);
       return saved === 'true';
     } catch {
       return false;
@@ -395,7 +392,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         p.id === 'proj-mkt-1' ||
         p.id.includes('mkt') ||
         p.key === 'MKT' ||
-        (p.department && normalizeDepartment(p.department) === 'marketing');
+        (p.department && normalizeDepartment(p.department) === 'marketing') ||
+        (p.members && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || m.includes('priya') || m.includes('aarav'))) ||
+        (p.lastUpdatedBy && (p.lastUpdatedBy.includes('Priya') || p.lastUpdatedBy.includes('Aarav')));
 
       if (currentDept === 'marketing') return isMkt;
       return !isMkt;
@@ -403,12 +402,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [projects, currentDept]);
 
   const scopedTasks = useMemo(() => {
+    const marketingProjIds = new Set(
+      projects
+        .filter(
+          p =>
+            p.id === 'proj-mkt-1' ||
+            p.id.includes('mkt') ||
+            p.key === 'MKT' ||
+            (p.department && normalizeDepartment(p.department) === 'marketing') ||
+            (p.members && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || m.includes('priya') || m.includes('aarav')))
+        )
+        .map(p => p.id)
+    );
+
     return tasks.filter(t => {
       // 1. Direct lead / marketing pipeline characteristics:
       const hasMarketingStatus = ['calling', 'field_visit', 'demo'].includes(t.status);
       const isLeadId = t.id && (t.id.startsWith('lead-') || t.id.includes('mkt'));
       const hasClientData = !!t.clientContact || !!t.clientLocation || !!t.clientPhone;
       const isExplicitMkt = t.department && normalizeDepartment(t.department) === 'marketing';
+      const isLinkedToMarketingProj = !!(t.projectId && marketingProjIds.has(t.projectId));
 
       const tAssignee = (t.assigneeId || '').toLowerCase();
       const tCreator = (t.createdById || '').toLowerCase();
@@ -427,22 +440,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const assigneeIsMarketing =
         (assigneeUser && getUserDepartment(assigneeUser) === 'marketing') ||
         tAssignee === 'user-marketing-emp' ||
+        tAssignee === 'user-marketing-mgr' ||
         tAssignee.includes('aarav') ||
+        tAssignee.includes('priya') ||
         tAssignee.includes('marketing');
 
       const creatorIsMarketing =
         (creatorUser && getUserDepartment(creatorUser) === 'marketing') ||
         tCreator === 'user-marketing-mgr' ||
+        tCreator === 'user-marketing-emp' ||
         tCreator.includes('priya') ||
+        tCreator.includes('aarav') ||
         tCreator.includes('marketing');
+
+      const hasMarketingTag = (t.tags || []).some((tg: string) => {
+        if (typeof tg !== 'string') return false;
+        const low = tg.toLowerCase();
+        return (
+          low.includes('calling') ||
+          low.includes('field visit') ||
+          low.includes('demo') ||
+          low.includes('lead') ||
+          low.startsWith('mkt_') ||
+          low.startsWith('stage:')
+        );
+      });
 
       const isMarketingTask =
         hasMarketingStatus ||
         isLeadId ||
         hasClientData ||
         isExplicitMkt ||
+        isLinkedToMarketingProj ||
         assigneeIsMarketing ||
-        creatorIsMarketing;
+        creatorIsMarketing ||
+        hasMarketingTag;
 
       if (currentDept === 'marketing') {
         return isMarketingTask;
@@ -450,7 +482,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return !isMarketingTask;
       }
     });
-  }, [tasks, users, currentDept]);
+  }, [tasks, users, projects, currentDept]);
 
   const scopedActivities = useMemo(() => {
     return activities.filter(a => {
@@ -504,13 +536,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
-  // Persist ONLY authentication session token and user ID across reloads (zero business data cached locally)
+  // Session-scoped active tab tokens only (zero localStorage footprint)
   useEffect(() => {
     try {
-      localStorage.setItem(`${STORAGE_KEY}_currentUserId`, currentUserId);
-      localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, String(isAuthenticated));
+      sessionStorage.setItem(`${STORAGE_KEY}_currentUserId`, currentUserId);
+      sessionStorage.setItem(`${STORAGE_KEY}_is_authenticated`, String(isAuthenticated));
     } catch (e) {
-      console.warn('Could not persist auth session to localStorage', e);
+      console.warn('Could not persist auth session to sessionStorage', e);
     }
   }, [currentUserId, isAuthenticated]);
 
@@ -556,22 +588,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             u.email !== 'alex.morgan@company.com' &&
             u.email !== 'david.chen@company.com' &&
             u.email !== 'elena.rostova@company.com' &&
-            u.email !== 'marcus.vance@company.com'
+            u.email !== 'marcus.vance@company.com' &&
+            !deletedUserIdsRef.current.includes(u.id) &&
+            !(u.email && deletedUserIdsRef.current.includes(u.email))
           );
 
-          // Ensure default personas (Software + Marketing) are always present and preserved in state
-          const existingEmails = new Set(filteredCloudUsers.map(u => u.email.toLowerCase()));
-          const missingDefaults = INITIAL_USERS.filter(du => !existingEmails.has(du.email.toLowerCase()));
-          if (missingDefaults.length > 0) {
-            for (const du of missingDefaults) {
-              upsertUserToSupabase(du).catch(() => {});
-            }
-          }
+          const cloudUserIds = new Set(filteredCloudUsers.map(u => u.id));
+          const cloudUserEmails = new Set(filteredCloudUsers.map(u => (u.email || '').toLowerCase()));
 
-          const allMergedUsers = [...filteredCloudUsers, ...missingDefaults];
-          if (allMergedUsers.length > 0) {
-            setUsers(allMergedUsers);
-          }
+          // Merge cloud users while preserving local pending team members not yet indexed by Supabase
+          setUsers(prevUsers => {
+            const localPending = prevUsers.filter(u => {
+              if (cloudUserIds.has(u.id)) return false;
+              if (u.email && cloudUserEmails.has(u.email.toLowerCase())) return false;
+              if (deletedUserIdsRef.current.includes(u.id)) return false;
+              if (u.email && deletedUserIdsRef.current.includes(u.email)) return false;
+              return true;
+            });
+
+            // Re-attempt cloud write for any pending user not yet confirmed in cloudUsers
+            if (localPending.length > 0) {
+              localPending.forEach(lu => upsertUserToSupabase(lu).catch(() => {}));
+            }
+
+            // Ensure missing default personas (Software + Marketing) are always present in the roster
+            const allEmails = new Set([
+              ...filteredCloudUsers.map(u => (u.email || '').toLowerCase()),
+              ...localPending.map(u => (u.email || '').toLowerCase())
+            ]);
+            const missingDefaults = INITIAL_USERS.filter(du =>
+              !allEmails.has(du.email.toLowerCase()) &&
+              !deletedUserIdsRef.current.includes(du.id) &&
+              !deletedUserIdsRef.current.includes(du.email)
+            );
+            if (missingDefaults.length > 0) {
+              for (const du of missingDefaults) {
+                upsertUserToSupabase(du).catch(() => {});
+              }
+            }
+
+            return [...filteredCloudUsers, ...localPending, ...missingDefaults];
+          });
         } else if (cloudUsers && cloudUsers.length === 0) {
           // Database users table is empty; populate all default personas into the database table
           ensureDefaultUsersInSupabase().then(() => pullCloudChanges(true)).catch(() => {});
@@ -585,8 +642,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const hydratedCloudTasks = cloudTasks.map(ct => {
               const local = existingTaskMap.get(ct.id);
               if (!local) return ct;
+              const isLocallyCompleted = local.status === 'completed';
               return {
                 ...ct,
+                status: isLocallyCompleted ? 'completed' : ct.status,
+                completedAt: ct.completedAt || local.completedAt,
                 clientContact: ct.clientContact || local.clientContact,
                 clientPhone: ct.clientPhone || local.clientPhone,
                 clientLocation: ct.clientLocation || local.clientLocation,
@@ -615,7 +675,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             );
 
             const mktDefaults = !hasMarketingTask
-              ? INITIAL_TASKS.filter(it => it.department === 'Marketing' && !cloudIds.has(it.id))
+              ? INITIAL_TASKS.filter(it => it.department === 'Marketing' && !cloudIds.has(it.id) && !deletedTaskIdsRef.current.includes(it.id))
               : [];
 
             if (!hasMarketingTask && mktDefaults.length > 0) {
@@ -640,18 +700,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
         }
 
-        // Sync Projects
+        // Sync Projects with local pending preservation so projects are never deleted unless manager explicitly deletes
         if (cloudProjects) {
-          const hasMarketingProj = cloudProjects.some(p =>
-            (p.department && p.department.toLowerCase().includes('market')) || p.id.includes('mkt')
-          );
-          const mktProjDefaults = !hasMarketingProj
-            ? INITIAL_PROJECTS.filter(ip => ip.department === 'Marketing' && !cloudProjects.some(p => p.id === ip.id))
-            : [];
-          if (!hasMarketingProj && mktProjDefaults.length > 0) {
-            mktProjDefaults.forEach(mp => upsertProjectToSupabase(mp).catch(() => {}));
-          }
-          setProjects([...cloudProjects, ...mktProjDefaults]);
+          setProjects(prevProjects => {
+            const cloudIds = new Set(cloudProjects.map(p => p.id));
+            const localPending = prevProjects.filter(p => {
+              if (cloudIds.has(p.id)) return false;
+              if (deletedProjectIdsRef.current.includes(p.id)) return false;
+              return true;
+            });
+
+            if (localPending.length > 0) {
+              localPending.forEach(lp => upsertProjectToSupabase(lp).catch(() => {}));
+            }
+
+            const allProjects = [...cloudProjects, ...localPending].filter(
+              p => !deletedProjectIdsRef.current.includes(p.id)
+            );
+
+            const hasMarketingProj = allProjects.some(p =>
+              (p.department && p.department.toLowerCase().includes('market')) || p.id.includes('mkt')
+            );
+            const mktProjDefaults = !hasMarketingProj
+              ? INITIAL_PROJECTS.filter(ip => ip.department === 'Marketing' && !cloudIds.has(ip.id) && !deletedProjectIdsRef.current.includes(ip.id))
+              : [];
+            if (!hasMarketingProj && mktProjDefaults.length > 0) {
+              mktProjDefaults.forEach(mp => upsertProjectToSupabase(mp).catch(() => {}));
+            }
+            return [...allProjects, ...mktProjDefaults];
+          });
         }
 
         // Sync Activities
@@ -1016,7 +1093,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return;
     }
 
-    const newUserId = `user-${Date.now()}`;
+    const isMkt = (data.department || '').toLowerCase().includes('market') || currentDept === 'marketing';
+    const newUserId = isMkt ? `user-mkt-${Date.now()}` : `user-${Date.now()}`;
     const defaultAvatars = [
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
@@ -1029,7 +1107,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const fallbackUsername = data.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
     const username = data.username?.trim().toLowerCase() || fallbackUsername;
     const password = data.password?.trim() || 'password123';
-    const dept = data.department?.trim() || (currentDept === 'marketing' ? 'Marketing' : 'Engineering');
+    const dept = data.department?.trim() || (isMkt ? 'Marketing' : 'Engineering');
 
     const newUser: User = {
       id: newUserId,
@@ -1412,10 +1490,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return;
     }
 
-    const updatedTask: Task = { ...oldTask, ...updates };
+    const updatedTask: Task = {
+      ...oldTask,
+      ...updates,
+      completedAt: updates.status === 'completed'
+        ? (oldTask.completedAt || new Date().toISOString())
+        : (updates.status && updates.status !== 'completed' ? undefined : (updates.completedAt !== undefined ? updates.completedAt : oldTask.completedAt))
+    };
     setTasks(prev => prev.map(t => (t.id === taskId ? updatedTask : t)));
     upsertTaskToSupabase(updatedTask);
-    realtimeSync.broadcast('TASK_UPDATED', { taskId, updates });
+    realtimeSync.broadcast('TASK_UPDATED', { taskId, updates: { ...updates, completedAt: updatedTask.completedAt } });
 
     // If reassigned to someone new, notify them
     if (updates.assigneeId && updates.assigneeId !== oldTask.assigneeId) {
@@ -1442,8 +1526,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addToast('Task Updated', `Changes saved successfully`, 'info');
   };
 
-  // Delete task
+  // Delete task (Manager only)
   const deleteTask = (taskId: string) => {
+    if (currentUser.role !== 'manager') {
+      addToast('Permission Denied', 'Only managers are authorized to delete tasks.', 'warning');
+      return;
+    }
     setDeletedTaskIds(prev => Array.from(new Set([...prev, taskId])));
     const task = tasks.find(t => t.id === taskId);
     setTasks(prev => prev.filter(t => t.id !== taskId));
@@ -1451,6 +1539,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     realtimeSync.broadcast('TASK_DELETED', { taskId });
     if (task) {
       addToast('Task Deleted', `"${task.title}" was removed`, 'info');
+    }
+  };
+
+  // Delete project (Manager only)
+  const deleteProject = (projectId: string) => {
+    if (currentUser.role !== 'manager') {
+      addToast('Permission Denied', 'Only managers are authorized to delete projects.', 'warning');
+      return;
+    }
+    setDeletedProjectIds(prev => Array.from(new Set([...prev, projectId])));
+    const proj = projects.find(p => p.id === projectId);
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    deleteProjectFromSupabase(projectId);
+    realtimeSync.broadcast('PROJECT_DELETED', { projectId });
+    if (selectedProjectId === projectId) {
+      setSelectedProjectId(null);
+    }
+    if (proj) {
+      addToast('Project Deleted', `"${proj.name}" was removed`, 'info');
     }
   };
 
@@ -1563,16 +1670,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Reset data to pristine production state
   const resetAllData = async () => {
     try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('taskflow_') && !key.includes('is_authenticated') && !key.includes('currentUserId')) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
+      localStorage.clear();
+      sessionStorage.clear();
     } catch (e) {
-      console.warn('Failed clearing localStorage:', e);
+      console.warn('Failed clearing storage:', e);
     }
 
     setUsers(INITIAL_USERS);
@@ -1666,8 +1767,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Set authenticated state & current user
     setCurrentUserId(matchedUser.id);
     setIsAuthenticated(true);
-    localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'true');
-    localStorage.setItem(`${STORAGE_KEY}_currentUserId`, matchedUser.id);
+    sessionStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'true');
+    sessionStorage.setItem(`${STORAGE_KEY}_currentUserId`, matchedUser.id);
 
     // Record login activity
     const newAct: ActivityLog = {
@@ -1705,7 +1806,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logout = () => {
     setIsAuthenticated(false);
-    localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'false');
+    sessionStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'false');
     addToast('Signed Out', 'You have been safely signed out of TaskFlow.', 'info');
   };
 
@@ -1769,6 +1870,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateTaskStatus,
         updateTask,
         deleteTask,
+        deleteProject,
         markNotificationRead,
         markAllNotificationsRead,
         sendNotification,

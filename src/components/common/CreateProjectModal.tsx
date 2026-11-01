@@ -12,7 +12,8 @@ import {
   Sparkles,
   Users,
   Shield,
-  Sliders
+  Sliders,
+  PhoneCall
 } from 'lucide-react';
 
 export const CreateProjectModal: React.FC = () => {
@@ -90,15 +91,15 @@ export const CreateProjectModal: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentUser.role !== 'manager') {
-      setError(isMarketing ? 'Only Marketing Managers are authorized to create new campaigns.' : 'Only Managers are authorized to create new project initiatives.');
+      setError(isMarketing ? 'Only Marketing Managers are authorized to register new products.' : 'Only Managers are authorized to create new project initiatives.');
       return;
     }
     if (!name.trim()) {
-      setError(isMarketing ? 'Campaign name is required' : 'Project name is required');
+      setError(isMarketing ? 'Product name is required' : 'Project name is required');
       return;
     }
     if (!key.trim()) {
-      setError(isMarketing ? 'Campaign code key is required (e.g. MKT, MUM)' : 'Project code key is required (e.g. SEC, INF)');
+      setError(isMarketing ? 'Product key code is required (e.g. CRM, ERP, SEC)' : 'Project code key is required (e.g. SEC, INF)');
       return;
     }
     if (!deadline) {
@@ -109,7 +110,7 @@ export const CreateProjectModal: React.FC = () => {
     createProject({
       name: name.trim(),
       key: key.trim().toUpperCase(),
-      description: description.trim() || (isMarketing ? 'Strategic marketing outreach and client acquisition campaign.' : 'Strategic software engineering initiative.'),
+      description: description.trim() || (isMarketing ? 'Commercial product line for enterprise sales and client acquisition.' : 'Strategic software engineering initiative.'),
       health,
       deadline,
       members: selectedMemberIds.length > 0 ? selectedMemberIds : [currentUser.id],
@@ -137,10 +138,10 @@ export const CreateProjectModal: React.FC = () => {
               </div>
               <div className="min-w-0">
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
-                  {isMarketing ? 'Launch New Marketing Campaign' : 'Create New Project'}
+                  {isMarketing ? 'Register New Commercial Product' : 'Create New Project'}
                 </h3>
                 <p className="text-xs text-slate-500 truncate">
-                  {isMarketing ? 'Launch an outreach drive, client acquisition initiative, or sales territory' : 'Launch a new strategic initiative with deadline and team'}
+                  {isMarketing ? 'Register a product line to track client calls, field visits, demonstrations, and deals won' : 'Launch a new strategic initiative with deadline and team'}
                 </p>
               </div>
             </div>
@@ -167,14 +168,14 @@ export const CreateProjectModal: React.FC = () => {
                   htmlFor="proj-name"
                   className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
                 >
-                  {isMarketing ? 'Campaign / Territory Name *' : 'Project Name *'}
+                  {isMarketing ? 'Product Name *' : 'Project Name *'}
                 </label>
                 <input
                   id="proj-name"
                   type="text"
                   value={name}
                   onChange={e => handleNameChange(e.target.value)}
-                  placeholder={isMarketing ? 'e.g. Q4 Mumbai Healthcare & Corporate Outreach' : 'e.g., Global Zero-Trust Auth Architecture'}
+                  placeholder={isMarketing ? 'e.g. Taskflow Cloud ERP Suite' : 'e.g., Global Zero-Trust Auth Architecture'}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-sm transition-all"
                   autoFocus
                 />
@@ -196,7 +197,7 @@ export const CreateProjectModal: React.FC = () => {
                     setKey(e.target.value.toUpperCase());
                     setKeyManuallyEdited(true);
                   }}
-                  placeholder={isMarketing ? 'MKT' : 'GZA'}
+                  placeholder={isMarketing ? 'CRM' : 'GZA'}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-emerald-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-sm uppercase transition-all"
                 />
               </div>
@@ -208,86 +209,116 @@ export const CreateProjectModal: React.FC = () => {
                 htmlFor="proj-desc"
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
               >
-                {isMarketing ? 'Campaign Scope & Strategy' : 'Description & Business Objectives'}
+                {isMarketing ? 'Product Overview & Commercial Details' : 'Description & Business Objectives'}
               </label>
               <textarea
                 id="proj-desc"
                 rows={3}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder={isMarketing ? 'Target client verticals, outreach targets, field demonstration territories...' : 'Detail the target outcomes, architectural scope, and success milestones...'}
+                placeholder={isMarketing ? 'Target client market, core modules, value proposition, and demonstration scope...' : 'Detail the target outcomes, architectural scope, and success milestones...'}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-sm transition-all resize-none"
               />
             </div>
 
-            {/* Deadline & Initial Health */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label
-                  className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
-                >
-                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                  Target Deadline *
-                </label>
-                <CustomDatePicker
-                  value={deadline}
-                  onChange={val => setDeadline(val)}
-                  className="w-full"
-                  buttonClassName="w-full py-2.5 px-3.5 text-xs sm:text-sm font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Initial Health Status
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'on_track', label: 'On Track', color: 'emerald' },
-                    { id: 'at_risk', label: 'At Risk', color: 'amber' },
-                    { id: 'behind', label: 'Behind', color: 'rose' }
-                  ].map(h => (
-                    <button
-                      key={h.id}
-                      type="button"
-                      onClick={() => setHealth(h.id as ProjectHealth)}
-                      className={`py-2 text-xs font-semibold rounded-xl border transition-all ${
-                        health === h.id
-                          ? 'border-slate-800 bg-slate-900 text-white shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {h.label}
-                    </button>
-                  ))}
+            {isMarketing ? (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                    Target Milestone Deadline *
+                  </label>
+                  <CustomDatePicker
+                    value={deadline}
+                    onChange={val => setDeadline(val)}
+                    className="w-full"
+                    buttonClassName="w-full py-2.5 px-3.5 text-xs sm:text-sm font-medium"
+                  />
+                </div>
+                <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-start gap-2.5">
+                  <PhoneCall className="w-4 h-4 text-emerald-700 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-emerald-950">Product Sales & Demonstration Pipeline</p>
+                    <p className="text-emerald-800 text-[11px] mt-0.5">
+                      Commercial product progress is measured by client qualification calls, scheduled field visits, demonstrations, and closed customer contracts.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Deadline & Initial Health */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                      Target Deadline *
+                    </label>
+                    <CustomDatePicker
+                      value={deadline}
+                      onChange={val => setDeadline(val)}
+                      className="w-full"
+                      buttonClassName="w-full py-2.5 px-3.5 text-xs sm:text-sm font-medium"
+                    />
+                  </div>
 
-            {/* Starting Progress Slider */}
-            <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-2">
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-emerald-600" />
-                  Initial Progress Percentage
-                </span>
-                <span className="text-lg font-extrabold text-emerald-800 tabular-nums">
-                  {initialProgress}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={initialProgress}
-                onChange={e => setInitialProgress(Number(e.target.value))}
-                className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-              />
-              <p className="text-[11px] text-slate-400">
-                Team members can manually adjust and advance this progress as work progresses.
-              </p>
-            </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Initial Health Status
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'on_track', label: 'On Track', color: 'emerald' },
+                        { id: 'at_risk', label: 'At Risk', color: 'amber' },
+                        { id: 'behind', label: 'Behind', color: 'rose' }
+                      ].map(h => (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => setHealth(h.id as ProjectHealth)}
+                          className={`py-2 text-xs font-semibold rounded-xl border transition-all ${
+                            health === h.id
+                              ? 'border-slate-800 bg-slate-900 text-white shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {h.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Starting Progress Slider */}
+                <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-2">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5 text-emerald-600" />
+                      Initial Progress Percentage
+                    </span>
+                    <span className="text-lg font-extrabold text-emerald-800 tabular-nums">
+                      {initialProgress}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={initialProgress}
+                    onChange={e => setInitialProgress(Number(e.target.value))}
+                    className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    Team members can manually adjust and advance this progress as work progresses.
+                  </p>
+                </div>
+              </>
+            )}
 
             {/* Assigned Team Members Multi-Select */}
             <div>
@@ -358,7 +389,7 @@ export const CreateProjectModal: React.FC = () => {
                 className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm hover:shadow transition-all"
               >
                 <Sparkles className="w-4 h-4" />
-                {isMarketing ? 'Launch Campaign' : 'Launch Project'}
+                {isMarketing ? 'Register Product' : 'Launch Project'}
               </button>
             </div>
           </form>
