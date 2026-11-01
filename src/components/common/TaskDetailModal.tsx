@@ -38,6 +38,7 @@ export const TaskDetailModal: React.FC = () => {
     updateTaskStatus,
     updateTask,
     deleteTask,
+    openConfirmModal,
     setCurrentView,
     sendMessage
   } = useApp();
@@ -168,10 +169,18 @@ export const TaskDetailModal: React.FC = () => {
               {currentUser.role === 'manager' && (
                 <button
                   onClick={() => {
-                    if (window.confirm(isMarketing ? 'Are you sure you want to delete this lead?' : 'Are you sure you want to delete this task?')) {
-                      deleteTask(task.id);
-                      setSelectedTaskId(null);
-                    }
+                    openConfirmModal({
+                      title: isMarketing ? 'Delete Client Lead' : 'Delete Task',
+                      message: isMarketing
+                        ? `Are you sure you want to delete lead "${task.title}"? This will permanently remove the lead contact information and stage records.`
+                        : `Are you sure you want to delete task "${task.title}"? This action cannot be undone.`,
+                      confirmText: isMarketing ? 'Delete Lead' : 'Delete Task',
+                      confirmVariant: 'danger',
+                      onConfirm: () => {
+                        deleteTask(task.id);
+                        setSelectedTaskId(null);
+                      }
+                    });
                   }}
                   className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                   title={isMarketing ? 'Delete Lead' : 'Delete Task'}

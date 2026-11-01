@@ -23,6 +23,7 @@ export const Header: React.FC<{ onMobileMenuClick: () => void }> = ({ onMobileMe
     setIsCreateProjectModalOpen,
     setIsCreateEmployeeModalOpen,
     resetAllData,
+    openConfirmModal,
     setCurrentView,
     supabaseStatus,
     supabaseLatencyMs,
@@ -258,10 +259,16 @@ export const Header: React.FC<{ onMobileMenuClick: () => void }> = ({ onMobileMe
 
                   <button
                     onClick={() => {
-                      if (window.confirm('Clear all tasks, projects, and messages to clean production state?')) {
-                        resetAllData();
-                      }
                       setIsProfileOpen(false);
+                      openConfirmModal({
+                        title: 'Clear All Data (Clean Slate)',
+                        message: 'Are you sure you want to clear all tasks, projects, and messages? This will reset the workspace to a clean production state.',
+                        confirmText: 'Clear All Data',
+                        confirmVariant: 'danger',
+                        onConfirm: () => {
+                          resetAllData();
+                        }
+                      });
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-medium transition-all"
                   >

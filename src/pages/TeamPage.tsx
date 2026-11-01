@@ -33,13 +33,13 @@ export const TeamPage: React.FC = () => {
     openChatWithUser,
     setIsCreateEmployeeModalOpen,
     setIsCreateModalOpen,
-    deleteEmployee
+    deleteEmployee,
+    openConfirmModal
   } = useApp();
 
   const [filterPresence, setFilterPresence] = useState<string>('all');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const isManager = currentUser.role === 'manager';
 
@@ -335,8 +335,18 @@ export const TeamPage: React.FC = () => {
                         <RoleBadge role={member.role} />
                         {isManager && (
                           <button
-                            onClick={() => setConfirmDeleteId(isDeleting ? null : member.id)}
-                            className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            onClick={() => {
+                              openConfirmModal({
+                                title: 'Remove Team Member',
+                                message: `Are you sure you want to remove ${member.name} (${member.title}) from the team roster? This will permanently delete their user credentials.`,
+                                confirmText: 'Remove Employee',
+                                confirmVariant: 'danger',
+                                onConfirm: () => {
+                                  deleteEmployee(member.id);
+                                }
+                              });
+                            }}
+                            className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Remove employee from team"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -346,36 +356,6 @@ export const TeamPage: React.FC = () => {
                       <PresenceBadge status={member.presence} variant="pill" size="sm" />
                     </div>
                   </div>
-
-                  {/* Inline Delete Confirmation for Manager */}
-                  {isDeleting && (
-                    <div className="mb-3 p-3 bg-rose-50 border border-rose-200 rounded-xl">
-                      <div className="flex items-center gap-2 text-rose-800 text-xs font-bold mb-1.5">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        <span>Remove {member.name}?</span>
-                      </div>
-                      <p className="text-[11px] text-rose-600 mb-2">
-                        This employee will be removed from the team roster.
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            deleteEmployee(member.id);
-                            setConfirmDeleteId(null);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-bold hover:bg-rose-700"
-                        >
-                          Confirm Remove
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 text-[10px] font-medium hover:bg-slate-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Member Name & Title */}
                   <div className="mb-3">

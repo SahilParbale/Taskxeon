@@ -19,6 +19,7 @@ export const SettingsPage: React.FC = () => {
     currentUser,
     setUserPresence,
     resetAllData,
+    openConfirmModal,
     supabaseStatus,
     supabaseLatencyMs,
     syncWithSupabase,
@@ -188,11 +189,17 @@ export const SettingsPage: React.FC = () => {
         <div className="pt-2">
           <button
             onClick={() => {
-              if (window.confirm('Reset all TaskFlow data to factory demo state? All custom tasks and status changes will be reset.')) {
-                resetAllData();
-              }
+              openConfirmModal({
+                title: 'Reset Demo Data',
+                message: 'Reset all TaskFlow data to factory demo state? All custom tasks, leads, and status changes will be reset to defaults.',
+                confirmText: 'Reset Demo Data',
+                confirmVariant: 'danger',
+                onConfirm: () => {
+                  resetAllData();
+                }
+              });
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
             Reset All Data to Initial Demo State

@@ -38,7 +38,8 @@ export const ProjectsPage: React.FC = () => {
     setIsCreateModalOpen,
     updateTaskStatus,
     activities,
-    deleteProject
+    deleteProject,
+    openConfirmModal
   } = useApp();
 
   const isMarketing = !!(currentUser.department && currentUser.department.toLowerCase().includes('market'));
@@ -237,10 +238,18 @@ export const ProjectsPage: React.FC = () => {
               {currentUser.role === 'manager' && (
                 <button
                   onClick={() => {
-                    if (window.confirm(`Are you sure you want to delete ${isProjectMarketing ? 'product' : 'project'} "${selectedProject.name}"? Only managers can perform this action.`)) {
-                      deleteProject(selectedProject.id);
-                      setSelectedProjectId(null);
-                    }
+                    openConfirmModal({
+                      title: isProjectMarketing ? 'Delete Commercial Product' : 'Delete Project',
+                      message: isProjectMarketing
+                        ? `Are you sure you want to delete commercial product "${selectedProject.name}"? This will permanently delete the product registration and unassign its associated client accounts.`
+                        : `Are you sure you want to delete project "${selectedProject.name}"? This action cannot be undone.`,
+                      confirmText: isProjectMarketing ? 'Delete Product' : 'Delete Project',
+                      confirmVariant: 'danger',
+                      onConfirm: () => {
+                        deleteProject(selectedProject.id);
+                        setSelectedProjectId(null);
+                      }
+                    });
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-semibold transition-colors cursor-pointer"
                   title={isProjectMarketing ? 'Delete Product (Manager Only)' : 'Delete Project (Manager Only)'}
@@ -1150,9 +1159,17 @@ export const ProjectsPage: React.FC = () => {
                       <button
                         onClick={e => {
                           e.stopPropagation();
-                          if (window.confirm(`Are you sure you want to delete ${isProjMkt ? 'product' : 'project'} "${project.name}"? Only managers can perform this action.`)) {
-                            deleteProject(project.id);
-                          }
+                          openConfirmModal({
+                            title: isProjMkt ? 'Delete Commercial Product' : 'Delete Project',
+                            message: isProjMkt
+                              ? `Are you sure you want to delete commercial product "${project.name}"? This will permanently delete the product registration and unassign its associated client accounts.`
+                              : `Are you sure you want to delete project "${project.name}"? This action cannot be undone.`,
+                            confirmText: isProjMkt ? 'Delete Product' : 'Delete Project',
+                            confirmVariant: 'danger',
+                            onConfirm: () => {
+                              deleteProject(project.id);
+                            }
+                          });
                         }}
                         className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title={isProjMkt ? 'Delete Product (Manager Only)' : 'Delete Project (Manager Only)'}

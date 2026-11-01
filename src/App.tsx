@@ -13,6 +13,7 @@ import { CreateTaskModal } from './components/common/CreateTaskModal';
 import { CreateProjectModal } from './components/common/CreateProjectModal';
 import { CreateEmployeeModal } from './components/common/CreateEmployeeModal';
 import { TaskDetailModal } from './components/common/TaskDetailModal';
+import { ConfirmModal } from './components/common/ConfirmModal';
 import { ToastContainer } from './components/common/Toast';
 import { InstallAppModal, MobileFloatingInstallPrompt } from './components/common/InstallAppModal';
 import { OfflineBanner } from './components/common/OfflineBanner';
@@ -31,6 +32,7 @@ const MainLayout: React.FC = () => {
         <OfflineBanner />
         <LoginPage />
         <ToastContainer />
+        <ConfirmModal />
         <InstallAppModal
           isOpen={isInstallModalOpen}
           onClose={() => setIsInstallModalOpen(false)}
@@ -120,6 +122,7 @@ const MainLayout: React.FC = () => {
       <CreateProjectModal />
       <CreateEmployeeModal />
       <TaskDetailModal />
+      <ConfirmModal />
       <ToastContainer />
       <MobileDrawer
         isOpen={isMobileMenuOpen}

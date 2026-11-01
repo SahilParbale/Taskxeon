@@ -34,6 +34,7 @@ export const MessagesPage: React.FC = () => {
     messages,
     sendMessage,
     clearMessages,
+    openConfirmModal,
     addToast,
     isMessagesTableMissing,
     activeChatTarget,
@@ -522,9 +523,15 @@ export const MessagesPage: React.FC = () => {
             {conversationMessages.length > 0 && activeChatTarget === 'team' && (
               <button
                 onClick={() => {
-                  if (window.confirm('Clear all messages from Team Chat?')) {
-                    clearMessages();
-                  }
+                  openConfirmModal({
+                    title: 'Clear Team Chat',
+                    message: 'Are you sure you want to clear all messages from Team Chat? This action will remove the conversation thread history.',
+                    confirmText: 'Clear Chat',
+                    confirmVariant: 'danger',
+                    onConfirm: () => {
+                      clearMessages();
+                    }
+                  });
                 }}
                 className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
                 title="Clear all messages from Team Chat"

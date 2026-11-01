@@ -60,7 +60,20 @@ export interface ToastMessage {
   type: 'success' | 'info' | 'warning' | 'error';
 }
 
+export interface ConfirmModalOptions {
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmVariant?: 'danger' | 'warning' | 'primary';
+  onConfirm: () => void;
+  onCancel?: () => void;
+}
+
 interface AppContextType {
+  confirmModal: ConfirmModalOptions | null;
+  openConfirmModal: (options: ConfirmModalOptions) => void;
+  closeConfirmModal: () => void;
   currentUser: User;
   users: User[];
   tasks: Task[];
@@ -238,6 +251,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeChatTarget, setActiveChatTarget] = useState<string>('team');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalOptions | null>(null);
+
+  const openConfirmModal = (options: ConfirmModalOptions) => {
+    setConfirmModal(options);
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal(null);
+  };
 
   const openChatWithUser = (userId: string) => {
     setActiveChatTarget(userId);
@@ -1882,6 +1904,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         resetAllData,
         addToast,
         removeToast,
+        confirmModal,
+        openConfirmModal,
+        closeConfirmModal,
         syncWithSupabase,
 
         supabaseStatus,
