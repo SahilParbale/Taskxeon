@@ -210,25 +210,20 @@ export const MessagesPage: React.FC = () => {
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        {/* Sidebar Brand Header */}
-        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0 bg-slate-900 text-white">
+        {/* Sidebar Header */}
+        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0 bg-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shadow-2xs">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200 shadow-2xs">
               <MessageSquare className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-bold tracking-tight">Conversations</h2>
-                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold border border-emerald-500/30 flex items-center gap-0.5">
-                  <Lock className="w-2.5 h-2.5" /> E2EE
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-medium">Team Chat & Personal DMs</p>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Conversations</h2>
+              <p className="text-[11px] text-slate-500 font-medium">Team Chat & Personal DMs</p>
             </div>
           </div>
           <button
             onClick={() => setIsMobileSidebarOpen(false)}
-            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
           >
             <X className="w-4 h-4" />
           </button>
