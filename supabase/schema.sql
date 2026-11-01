@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Tasks & Deliverables Table
+-- 3. Tasks & Deliverables Table (Supports both Engineering Deliverables & Marketing Field Operations)
 CREATE TABLE IF NOT EXISTS public.tasks (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -48,6 +48,10 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   tags JSONB DEFAULT '[]'::jsonb,
   estimated_hours NUMERIC,
   department TEXT DEFAULT 'Engineering',
+  client_contact TEXT,
+  client_phone TEXT,
+  client_location TEXT,
+  stage_outcome TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
@@ -130,10 +134,27 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 
 -- ============================================================================
--- Migration Helpers for Existing Deployments: Add department column
+-- Migration Helpers for Existing Deployments: Add department column & marketing stages
 -- ============================================================================
+ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS client_contact TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS client_phone TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS client_location TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS stage_outcome TEXT;
+
+-- ============================================================================
+-- Performance Indexes for Ultra-Fast Queries
+-- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee_id ON public.tasks(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON public.tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_department ON public.tasks(department);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON public.tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_projects_department ON public.projects(department);
+CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON public.messages(channel_id);
 
 -- ============================================================================
 -- Seed Initial Users (Software Development & Marketing Personas)
@@ -149,4 +170,35 @@ ON CONFLICT (id) DO UPDATE SET
   email = EXCLUDED.email,
   role = EXCLUDED.role,
   title = EXCLUDED.title,
+  department = EXCLUDED.department;
+
+-- ============================================================================
+-- Seed Initial Projects (Software Development & Marketing Campaigns)
+-- ============================================================================
+INSERT INTO public.projects (id, name, key, description, health, deadline, members, progress, department, last_updated_by, last_updated_at)
+VALUES
+  ('proj-eng-1', 'Platform Core Sprint', 'DEV', 'Real-time task synchronization, end-to-end encryption, and CI/CD automation.', 'on_track', '2026-12-15', '["user-1", "user-2"]'::jsonb, 65, 'Engineering', 'Shreyas Jadhav', 'Just now'),
+  ('proj-mkt-1', 'Q4 Product Launch Campaign', 'MKT', 'Digital brand awareness, SEO positioning, newsletter launches, and client outreach.', 'on_track', '2026-12-31', '["user-marketing-mgr", "user-marketing-emp"]'::jsonb, 40, 'Marketing', 'Priya Sharma', 'Just now')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  key = EXCLUDED.key,
+  description = EXCLUDED.description,
+  department = EXCLUDED.department;
+
+-- ============================================================================
+-- Seed Marketing Client Engagements / Field Leads
+-- ============================================================================
+INSERT INTO public.tasks (id, title, description, project_id, assignee_id, created_by_id, priority, status, due_date, tags, department, client_contact, client_phone, client_location, stage_outcome)
+VALUES
+  ('lead-mkt-1', 'Zenith Logistics & Supply', 'Introductory qualification call to understand fleet management requirements.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'high', 'calling', '2026-11-03', '["Calling", "Inbound Lead"]'::jsonb, 'Marketing', 'Sunil Nair (Director)', '+91 98210 11223', 'Andheri East, Mumbai', NULL),
+  ('lead-mkt-2', 'Apex Healthcare Network', 'On-site corporate visit to inspect hospital facility and meet clinical admin team.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'urgent', 'field_visit', '2026-11-04', '["Field Visit", "Enterprise"]'::jsonb, 'Marketing', 'Dr. Rajesh Iyer', '+91 98330 44556', 'BKC Complex, Mumbai', NULL),
+  ('lead-mkt-3', 'Reliance Retail Franchise', 'Live solution demonstration scheduled with procurement department.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'high', 'demo', '2026-11-06', '["Product Demo", "Corporate"]'::jsonb, 'Marketing', 'Pooja Deshmukh (Procurement Lead)', '+91 98700 77889', 'Navi Mumbai Hub', NULL),
+  ('lead-mkt-4', 'Metropolis Diagnostic Labs', 'Contract finalized. 50 user licenses approved following on-site demo.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'medium', 'completed', '2026-11-01', '["Closed Won", "Signed Contract"]'::jsonb, 'Marketing', 'Vikram Malhotra', '+91 98190 33445', 'Worli, Mumbai', 'Signed annual contract for 50 enterprise seats.')
+ON CONFLICT (id) DO UPDATE SET
+  title = EXCLUDED.title,
+  client_contact = EXCLUDED.client_contact,
+  client_phone = EXCLUDED.client_phone,
+  client_location = EXCLUDED.client_location,
+  stage_outcome = EXCLUDED.stage_outcome,
+  status = EXCLUDED.status,
   department = EXCLUDED.department;

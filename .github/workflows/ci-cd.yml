@@ -1,57 +1,99 @@
-name: Taskxeon CI/CD Pipeline
+name: TaskFlow Enterprise CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
+      - master
   pull_request:
     branches:
       - main
+      - master
   workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
 
-# Permissions for deploying to GitHub Pages
+# Permissions for deploying to GitHub Pages & Artifact storage
 permissions:
   contents: read
   pages: write
   id-token: write
+  deployments: write
 
-# Allow one concurrent deployment
+# Prevent concurrent deployments that could clash
 concurrency:
-  group: 'pages'
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # 1. Continuous Integration (Lint, Typecheck & Build)
+  # ============================================================================
+  # Stage 1: Continuous Integration (Lint, Typecheck & Production Build)
+  # ============================================================================
   ci:
-    name: Build & Verify
+    name: Build, Lint & Verify
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Source Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 20 Runtime
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Clean Dependencies
         run: npm ci
 
-      - name: Run TypeScript & Production Build
+      - name: Static Typecheck (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Build Production Assets
+        env:
+          CI: true
+          NODE_ENV: production
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://xdwkcybxgqdtnpnypxfj.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhkd2tjeWJ4Z3FkdG5wbnlweGZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMzc0NDYsImV4cCI6MjA1NTYxMzQ0Nn0.2YI4j-x-w_bI_eN-2T2L6Y_t0vM7a-V1rV4c3xX8eYo' }}
         run: npm run build
 
-      - name: Upload Production Artifact
+      - name: Validate Output Bundle
+        run: |
+          if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
+            echo "Error: dist/index.html was not generated!"
+            exit 1
+          fi
+          echo "Production build verified successfully. Asset inventory:"
+          ls -lh dist
+
+      - name: Upload Build Artifact for Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskflow-production-dist
+          path: dist/
+          retention-days: 14
+
+      - name: Prepare GitHub Pages Deployment Artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
         with:
           path: ./dist
 
-  # 2. Continuous Deployment (Auto-Deploy to GitHub Pages)
-  deploy:
+  # ============================================================================
+  # Stage 2: Continuous Deployment to GitHub Pages (Static Hosting)
+  # ============================================================================
+  deploy-pages:
     name: Continuous Deployment (GitHub Pages)
     needs: ci
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -60,3 +102,30 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # ============================================================================
+  # Stage 3: Continuous Deployment to Vercel (Edge Cloud Hosting)
+  # ============================================================================
+  deploy-vercel:
+    name: Continuous Deployment (Vercel Production)
+    needs: ci
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && secrets.VERCEL_TOKEN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Download Pre-built Dist Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: taskflow-production-dist
+          path: dist
+
+      - name: Deploy Pre-built Bundle to Vercel Production
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./

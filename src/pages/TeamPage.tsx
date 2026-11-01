@@ -49,6 +49,32 @@ export const TeamPage: React.FC = () => {
   const breakCount = employeeUsers.filter(u => u.presence === 'break').length;
   const offlineCount = employeeUsers.filter(u => u.presence === 'offline').length;
 
+  const isTaskAssignedToUser = (
+    t: { assigneeId: string },
+    u: { id: string; email?: string; name?: string; username?: string }
+  ): boolean => {
+    if (!t || !t.assigneeId || !u) return false;
+    const tAssignee = String(t.assigneeId).trim().toLowerCase();
+    const uId = String(u.id).trim().toLowerCase();
+    const uEmail = u.email ? u.email.trim().toLowerCase() : '';
+    const uName = u.name ? u.name.trim().toLowerCase() : '';
+    const uUsername = u.username ? u.username.trim().toLowerCase() : '';
+
+    if (tAssignee === uId) return true;
+    if (uEmail && tAssignee === uEmail) return true;
+    if (uUsername && tAssignee === uUsername) return true;
+
+    const isUserAarav = uId === 'user-marketing-emp' || uEmail.includes('aarav') || uName.includes('aarav') || uUsername === 'aarav';
+    const isTaskAssignedAarav = tAssignee === 'user-marketing-emp' || tAssignee.includes('aarav') || tAssignee === 'aarav.mehta@taskflow.io';
+    if (isUserAarav && isTaskAssignedAarav) return true;
+
+    const isUserSahil = uId === 'user-2' || uEmail.includes('sahil') || uName.includes('sahil') || uUsername === 'sahil';
+    const isTaskAssignedSahil = tAssignee === 'user-2' || tAssignee.includes('sahil') || tAssignee === 'sahilparbale@gmail.com';
+    if (isUserSahil && isTaskAssignedSahil) return true;
+
+    return false;
+  };
+
   // Extract distinct departments for filter dropdown
   const departments = Array.from(new Set(employeeUsers.map(u => u.department))).filter(Boolean);
 
@@ -277,7 +303,7 @@ export const TeamPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredUsers.map(member => {
-            const memberTasks = tasks.filter(t => t.assigneeId === member.id);
+            const memberTasks = tasks.filter(t => isTaskAssignedToUser(t, member));
             const activeTasks = memberTasks.filter(t => t.status !== 'completed');
             const completedCount = memberTasks.filter(t => t.status === 'completed').length;
             const isCurrent = member.id === currentUser.id;

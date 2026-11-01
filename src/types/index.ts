@@ -4,7 +4,14 @@ export type PresenceStatus = 'online' | 'break' | 'offline';
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
-export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'completed';
+export type TaskStatus = 
+  | 'todo' 
+  | 'in_progress' 
+  | 'blocked' 
+  | 'completed'
+  | 'calling'
+  | 'field_visit'
+  | 'demo';
 
 export type ProjectHealth = 'on_track' | 'at_risk' | 'behind';
 
@@ -34,12 +41,17 @@ export interface Task {
   createdById: string;
   priority: TaskPriority;
   status: TaskStatus;
-  dueDate: string; // ISO date string YYYY-MM-DD
+  dueDate: string; // ISO date string YYYY-MM-DD (Scheduled visit/call date)
   createdAt: string;
   completedAt?: string;
   tags?: string[];
   estimatedHours?: number;
   department?: string;
+  // Field Operations & Client Engagement Metadata:
+  clientContact?: string;
+  clientPhone?: string;
+  clientLocation?: string;
+  stageOutcome?: string;
 }
 
 export interface Project {

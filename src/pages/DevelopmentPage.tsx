@@ -14,13 +14,96 @@ import {
   Radio,
   ArrowRight,
   Filter,
-  Lock
+  Lock,
+  Copy,
+  Check,
+  FileCode,
+  Layers
 } from 'lucide-react';
 
 export const DevelopmentPage: React.FC = () => {
   const { currentUser, setCurrentView, devPipelines, devLogs } = useApp();
 
   const [logFilter, setLogFilter] = useState<'all' | 'error' | 'warn' | 'info' | 'success'>('all');
+  const [copiedWorkflow, setCopiedWorkflow] = useState(false);
+  const [showWorkflowCode, setShowWorkflowCode] = useState(false);
+
+  const workflowYaml = `name: TaskFlow Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  deployments: write
+
+concurrency:
+  group: \${{ github.workflow }}-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build, Lint & Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taskflow-production-dist
+          path: dist/
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          path: ./dist
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: ci
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  deploy-vercel:
+    name: Deploy to Vercel Production
+    needs: ci
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && secrets.VERCEL_TOKEN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: taskflow-production-dist
+          path: dist
+      - uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: \${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: \${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: \${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'`;
+
+  const handleCopyWorkflow = () => {
+    navigator.clipboard.writeText(workflowYaml);
+    setCopiedWorkflow(true);
+    setTimeout(() => setCopiedWorkflow(false), 2500);
+  };
 
   // RBAC Guard
   const isAuthorized = currentUser.role === 'manager';
@@ -186,6 +269,92 @@ export const DevelopmentPage: React.FC = () => {
             );
           })}
         </div>
+      </div>
+
+      {/* CI/CD Pipeline Architecture & GitHub Actions Configuration */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700">
+              <FileCode className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">GitHub Actions CI/CD Pipeline Configuration</h3>
+              <p className="text-xs text-slate-500 font-mono">.github/workflows/ci-cd.yml</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowWorkflowCode(prev => !prev)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <FileCode className="w-3.5 h-3.5 text-slate-500" />
+              <span>{showWorkflowCode ? 'Hide YAML' : 'View Workflow YAML'}</span>
+            </button>
+            <button
+              onClick={handleCopyWorkflow}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            >
+              {copiedWorkflow ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedWorkflow ? 'Copied to Clipboard' : 'Copy CI/CD Workflow'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Pipeline Stages Flow */}
+        <div className="p-4 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage 1: CI Verification</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            </div>
+            <p className="text-xs font-bold text-slate-900">Build, Lint & Static Analysis</p>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Executes <code className="font-mono bg-slate-100 px-1 py-0.2 rounded text-[10px]">tsc --noEmit</code> and <code className="font-mono bg-slate-100 px-1 py-0.2 rounded text-[10px]">vite build</code> on Node 20 with npm caching.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage 2: CD GitHub Pages</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            </div>
+            <p className="text-xs font-bold text-slate-900">Zero-Downtime Static CDN</p>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Uploads compiled <code className="font-mono bg-slate-100 px-1 py-0.2 rounded text-[10px]">dist/</code> artifact and deploys automatically upon merge into main.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage 3: CD Vercel Production</span>
+              <span className="w-2 h-2 rounded-full bg-indigo-500" />
+            </div>
+            <p className="text-xs font-bold text-slate-900">Edge Global Distribution</p>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Triggers production deployment via Vercel CLI when <code className="font-mono bg-slate-100 px-1 py-0.2 rounded text-[10px]">VERCEL_TOKEN</code> secret is provided.
+            </p>
+          </div>
+        </div>
+
+        {/* Expandable YAML Viewer */}
+        {showWorkflowCode && (
+          <div className="p-4 bg-slate-950 font-mono text-xs text-slate-300 overflow-x-auto max-h-96">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-slate-400 text-[11px]">
+              <span>.github/workflows/ci-cd.yml</span>
+              <button
+                onClick={handleCopyWorkflow}
+                className="text-emerald-400 hover:text-emerald-300 text-[11px] font-semibold cursor-pointer"
+              >
+                {copiedWorkflow ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <pre className="text-slate-300 leading-relaxed whitespace-pre font-mono text-[11px]">
+              {workflowYaml}
+            </pre>
+          </div>
+        )}
       </div>
 
       {/* Technical Log Stream */}

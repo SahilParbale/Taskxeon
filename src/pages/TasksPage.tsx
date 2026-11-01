@@ -17,7 +17,14 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
-  X
+  X,
+  Phone,
+  PhoneCall,
+  MapPin,
+  Presentation,
+  Building2,
+  User as UserIcon,
+  ArrowRight
 } from 'lucide-react';
 import { getTodayDateString, isToday, isPastDate, formatCustomDateLabel } from '../lib/dateUtils';
 import { CustomSelect } from '../components/common/CustomSelect';
@@ -36,10 +43,15 @@ export const TasksPage: React.FC = () => {
     sendMessage
   } = useApp();
 
+  const isMarketing = !!(currentUser.department && currentUser.department.toLowerCase().includes('market'));
+
   const handleDiscussInGroupChat = (task: any) => {
+    const channel = isMarketing ? 'ch-marketing' : 'ch-engineering';
     sendMessage(
-      `Let's discuss task "${task.title}" (Due: ${task.dueDate} | Priority: ${task.priority.toUpperCase()})`,
-      'ch-team-chat'
+      isMarketing
+        ? `Let's coordinate on client lead "${task.title}" (Stage: ${task.status.toUpperCase()} | Meeting: ${task.dueDate} | Contact: ${task.clientContact || 'N/A'})`
+        : `Let's discuss task "${task.title}" (Due: ${task.dueDate} | Priority: ${task.priority.toUpperCase()})`,
+      channel
     );
     setCurrentView('messages');
   };
@@ -53,7 +65,7 @@ export const TasksPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedProjectFilter, setSelectedProjectFilter] = useState('all');
   // The 2 primary date modes requested by user:
-  // 1. 'due_date': According to Due Date
+  // 1. 'due_date': According to Due Date / Scheduled Meeting Date
   // 2. 'assigned_date': Assigned on the Respective Date
   const [dateFilterMode, setDateFilterMode] = useState<'due_date' | 'assigned_date'>('due_date');
   const [selectedDate, setSelectedDate] = useState<string>('all');
@@ -66,29 +78,110 @@ export const TasksPage: React.FC = () => {
 
   const todayStr = getTodayDateString();
 
+  // Helper to match assignee to user across id, email, username, and personas
+  const isTaskAssignedToUser = (
+    task: { assigneeId: string },
+    user: { id: string; email?: string; name?: string; username?: string }
+  ): boolean => {
+    if (!task || !task.assigneeId || !user) return false;
+
+    const tAssignee = String(task.assigneeId).trim().toLowerCase();
+    const uId = String(user.id).trim().toLowerCase();
+    const uEmail = user.email ? user.email.trim().toLowerCase() : '';
+    const uName = user.name ? user.name.trim().toLowerCase() : '';
+    const uUsername = user.username ? user.username.trim().toLowerCase() : '';
+
+    if (tAssignee === uId) return true;
+    if (uEmail && tAssignee === uEmail) return true;
+    if (uUsername && tAssignee === uUsername) return true;
+
+    const isUserAarav =
+      uId === 'user-marketing-emp' ||
+      uEmail.includes('aarav') ||
+      uName.includes('aarav') ||
+      uUsername === 'aarav';
+
+    const isTaskAssignedAarav =
+      tAssignee === 'user-marketing-emp' ||
+      tAssignee.includes('aarav') ||
+      tAssignee === 'aarav.mehta@taskflow.io';
+
+    if (isUserAarav && isTaskAssignedAarav) return true;
+
+    const isUserSahil =
+      uId === 'user-2' ||
+      uEmail.includes('sahil') ||
+      uName.includes('sahil') ||
+      uUsername === 'sahil';
+
+    const isTaskAssignedSahil =
+      tAssignee === 'user-2' ||
+      tAssignee.includes('sahil') ||
+      tAssignee === 'sahilparbale@gmail.com';
+
+    if (isUserSahil && isTaskAssignedSahil) return true;
+
+    return false;
+  };
+
+  const findAssigneeUser = (assigneeId: string) => {
+    if (!assigneeId) return undefined;
+    const aId = assigneeId.toLowerCase();
+    return (
+      users.find(u =>
+        u.id === assigneeId ||
+        (u.email && u.email.toLowerCase() === aId) ||
+        (u.username && u.username.toLowerCase() === aId)
+      ) ||
+      (aId === 'user-marketing-emp' || aId.includes('aarav')
+        ? users.find(u => u.id === 'user-marketing-emp' || u.email.includes('aarav') || u.name.includes('Aarav'))
+        : undefined) ||
+      (aId === 'user-2' || aId.includes('sahil')
+        ? users.find(u => u.id === 'user-2' || u.email.includes('sahil') || u.name.includes('Sahil'))
+        : undefined)
+    );
+  };
 
   // Role-based task pool:
-  // - Employees strictly see only tasks assigned to them (t.assigneeId === currentUser.id)
+  // - Employees strictly see only tasks assigned to them
   // - Managers see all tasks across all assignees
   const roleScopedTasks = currentUser.role === 'employee'
-    ? tasks.filter(t => t.assigneeId === currentUser.id)
+    ? tasks.filter(t => isTaskAssignedToUser(t, currentUser))
     : tasks;
 
   // Filter tasks across all dates or selected date scope
   const filteredTasks = roleScopedTasks.filter(t => {
     if (search.trim()) {
       const q = search.toLowerCase();
-      const match = t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
+      const match =
+        t.title.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q) ||
+        (t.clientContact && t.clientContact.toLowerCase().includes(q)) ||
+        (t.clientLocation && t.clientLocation.toLowerCase().includes(q)) ||
+        (t.clientPhone && t.clientPhone.includes(q));
       if (!match) return false;
     }
     if (selectedPriority !== 'all' && t.priority !== selectedPriority) return false;
 
     // Only managers can filter by another specific assignee
-    if (currentUser.role === 'manager' && selectedAssignee !== 'all' && t.assigneeId !== selectedAssignee) {
-      return false;
+    if (currentUser.role === 'manager' && selectedAssignee !== 'all') {
+      const targetAssigneeUser = findAssigneeUser(selectedAssignee) || users.find(u => u.id === selectedAssignee);
+      const isTarget = targetAssigneeUser
+        ? isTaskAssignedToUser(t, targetAssigneeUser)
+        : t.assigneeId === selectedAssignee;
+      if (!isTarget) return false;
     }
 
-    if (selectedStatus !== 'all' && t.status !== selectedStatus) return false;
+    if (selectedStatus !== 'all') {
+      if (isMarketing) {
+        if (selectedStatus === 'calling' && t.status !== 'calling' && t.status !== 'todo') return false;
+        if (selectedStatus === 'field_visit' && t.status !== 'field_visit' && t.status !== 'in_progress') return false;
+        if (selectedStatus === 'demo' && t.status !== 'demo' && t.status !== 'blocked') return false;
+        if (selectedStatus === 'completed' && t.status !== 'completed') return false;
+      } else {
+        if (t.status !== selectedStatus) return false;
+      }
+    }
     if (selectedProjectFilter !== 'all' && t.projectId !== selectedProjectFilter) return false;
 
     // The 2 core date filters: Due Date vs Assigned Date
@@ -134,12 +227,19 @@ export const TasksPage: React.FC = () => {
   const dueTodayTasksCount = roleScopedTasks.filter(t => t.dueDate === todayStr).length;
   const assignedTodayTasksCount = roleScopedTasks.filter(t => t.createdAt && t.createdAt.startsWith(todayStr)).length;
 
-  const kanbanColumns: { id: TaskStatus; label: string; dotColor: string }[] = [
-    { id: 'todo', label: 'To Do', dotColor: 'bg-slate-400' },
-    { id: 'in_progress', label: 'In Progress', dotColor: 'bg-emerald-500' },
-    { id: 'blocked', label: 'Blocked', dotColor: 'bg-rose-500' },
-    { id: 'completed', label: 'Completed', dotColor: 'bg-emerald-700' }
-  ];
+  const kanbanColumns: { id: TaskStatus; label: string; dotColor: string }[] = isMarketing
+    ? [
+        { id: 'calling', label: 'Calling & Outreach', dotColor: 'bg-sky-500' },
+        { id: 'field_visit', label: 'Field Visits', dotColor: 'bg-amber-500' },
+        { id: 'demo', label: 'Product Demos', dotColor: 'bg-purple-500' },
+        { id: 'completed', label: 'Closed / Converted', dotColor: 'bg-emerald-600' }
+      ]
+    : [
+        { id: 'todo', label: 'To Do', dotColor: 'bg-slate-400' },
+        { id: 'in_progress', label: 'In Progress', dotColor: 'bg-emerald-500' },
+        { id: 'blocked', label: 'Blocked', dotColor: 'bg-rose-500' },
+        { id: 'completed', label: 'Completed', dotColor: 'bg-emerald-700' }
+      ];
 
   return (
     <div className="py-6 px-4 sm:px-8 max-w-7xl mx-auto space-y-6">
@@ -147,12 +247,18 @@ export const TasksPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            {currentUser.role === 'employee' ? 'My Assigned Tasks' : 'All Sprint Tasks'}
+            {isMarketing
+              ? (currentUser.role === 'employee' ? 'My Calls, Field Visits & Demos' : 'Client Pipeline & Field Operations')
+              : (currentUser.role === 'employee' ? 'My Assigned Tasks' : 'All Sprint Tasks')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            {currentUser.role === 'employee'
-              ? 'View and manage tasks specifically assigned to your persona.'
-              : 'Assign deliverables to employees and monitor team execution across the sprint.'}
+            {isMarketing
+              ? (currentUser.role === 'employee'
+                  ? 'Manage your scheduled client calls, on-site field visits, and product demonstrations.'
+                  : 'Track client calling outreach, on-site field visits, product demonstrations, and closed accounts.')
+              : (currentUser.role === 'employee'
+                  ? 'View and manage tasks specifically assigned to your persona.'
+                  : 'Assign deliverables to employees and monitor team execution across the sprint.')}
           </p>
         </div>
 
@@ -186,10 +292,10 @@ export const TasksPage: React.FC = () => {
           {currentUser.role === 'manager' && (
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex-shrink-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex-shrink-0 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              <span>Assign Task</span>
+              {isMarketing ? <PhoneCall className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              <span>{isMarketing ? 'Schedule Call / Visit' : 'Assign Task'}</span>
             </button>
           )}
         </div>
@@ -282,32 +388,42 @@ export const TasksPage: React.FC = () => {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Filter tasks by title or details..."
+              placeholder={isMarketing ? 'Filter leads by company, contact, or location...' : 'Filter tasks by title or details...'}
               className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
             />
           </div>
 
-          {/* Status Filter */}
+          {/* Status / Stage Filter */}
           <CustomSelect
             value={selectedStatus}
             onChange={val => setSelectedStatus(val)}
-            options={[
-              { value: 'all', label: 'All Statuses' },
-              { value: 'todo', label: 'To Do' },
-              { value: 'in_progress', label: 'In Progress' },
-              { value: 'blocked', label: 'Blocked' },
-              { value: 'completed', label: 'Completed' }
-            ]}
+            options={
+              isMarketing
+                ? [
+                    { value: 'all', label: 'All Pipeline Stages' },
+                    { value: 'calling', label: 'Calling & Outreach' },
+                    { value: 'field_visit', label: 'Field Visits' },
+                    { value: 'demo', label: 'Product Demos' },
+                    { value: 'completed', label: 'Closed / Converted' }
+                  ]
+                : [
+                    { value: 'all', label: 'All Statuses' },
+                    { value: 'todo', label: 'To Do' },
+                    { value: 'in_progress', label: 'In Progress' },
+                    { value: 'blocked', label: 'Blocked' },
+                    { value: 'completed', label: 'Completed' }
+                  ]
+            }
           />
 
-          {/* Project Filter */}
+          {/* Project / Campaign Filter */}
           {projects.length > 0 && (
             <CustomSelect
               icon={<Folder className="w-3.5 h-3.5" />}
               value={selectedProjectFilter}
               onChange={val => setSelectedProjectFilter(val)}
               options={[
-                { value: 'all', label: 'All Projects' },
+                { value: 'all', label: isMarketing ? 'All Campaigns' : 'All Projects' },
                 ...projects
                   .filter(p => currentUser.role === 'manager' || p.members.includes(currentUser.id))
                   .map(p => ({
@@ -397,13 +513,18 @@ export const TasksPage: React.FC = () => {
             </div>
             <div>
               <p className="font-bold text-slate-900">
-                Tasks {dateFilterMode === 'due_date' ? 'Due on' : 'Assigned on'}{' '}
+                {isMarketing ? 'Client Engagements' : 'Tasks'}{' '}
+                {dateFilterMode === 'due_date'
+                  ? isMarketing
+                    ? 'Scheduled on'
+                    : 'Due on'
+                  : 'Assigned on'}{' '}
                 {formatCustomDateLabel(selectedDate)}
               </p>
               <p className="text-[11px] text-slate-600">
                 {filteredTasks.length === 0
-                  ? `No tasks ${dateFilterMode === 'due_date' ? 'due' : 'assigned'} on this date. Click below to view all dates.`
-                  : `Showing ${filteredTasks.length} task${filteredTasks.length === 1 ? '' : 's'} ${dateFilterMode === 'due_date' ? 'due' : 'assigned'} on this date.`}
+                  ? `No ${isMarketing ? 'client engagements' : 'tasks'} ${dateFilterMode === 'due_date' ? (isMarketing ? 'scheduled' : 'due') : 'assigned'} on this date. Click below to view all dates.`
+                  : `Showing ${filteredTasks.length} ${isMarketing ? 'lead' : 'task'}${filteredTasks.length === 1 ? '' : 's'} ${dateFilterMode === 'due_date' ? (isMarketing ? 'scheduled' : 'due') : 'assigned'} on this date.`}
               </p>
             </div>
           </div>
@@ -421,7 +542,16 @@ export const TasksPage: React.FC = () => {
       {viewMode === 'board' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {kanbanColumns.map(col => {
-            const columnTasks = sortedTasks.filter(t => t.status === col.id);
+            const columnTasks = sortedTasks.filter(t => {
+              if (isMarketing) {
+                if (col.id === 'calling') return t.status === 'calling' || t.status === 'todo';
+                if (col.id === 'field_visit') return t.status === 'field_visit' || t.status === 'in_progress';
+                if (col.id === 'demo') return t.status === 'demo' || t.status === 'blocked';
+                if (col.id === 'completed') return t.status === 'completed';
+              }
+              return t.status === col.id;
+            });
+
             return (
               <div
                 key={col.id}
@@ -444,11 +574,11 @@ export const TasksPage: React.FC = () => {
                 <div className="space-y-3 flex-1 overflow-y-auto">
                   {columnTasks.length === 0 ? (
                     <div className="h-32 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-xs text-slate-400">
-                      No tasks in this stage
+                      {isMarketing ? 'No leads in this stage' : 'No tasks in this stage'}
                     </div>
                   ) : (
                     columnTasks.map(task => {
-                      const assignee = users.find(u => u.id === task.assigneeId);
+                      const assignee = findAssigneeUser(task.assigneeId);
                       const project = projects.find(p => p.id === task.projectId);
                       const isOverdue =
                         task.status !== 'completed' && isPastDate(task.dueDate);
@@ -465,12 +595,14 @@ export const TasksPage: React.FC = () => {
                           <div className="flex items-center justify-between gap-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-100">
-                                TASK-{task.id.replace('task-', '')}
+                                {isMarketing
+                                  ? `LEAD-${task.id.replace('lead-', '').replace('task-', '')}`
+                                  : `TASK-${task.id.replace('task-', '')}`}
                               </span>
                               {project && (
                                 <span
                                   className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
-                                  title={`Project: ${project.name}`}
+                                  title={`${isMarketing ? 'Campaign' : 'Project'}: ${project.name}`}
                                 >
                                   {project.key}
                                 </span>
@@ -479,9 +611,43 @@ export const TasksPage: React.FC = () => {
                             <PriorityBadge priority={task.priority} />
                           </div>
 
-                          <h4 className="text-xs font-bold text-slate-900 leading-snug group-hover:text-emerald-800 transition-colors">
-                            {task.title}
-                          </h4>
+                          {/* Client / Task Title */}
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-slate-900 leading-snug group-hover:text-emerald-800 transition-colors">
+                              {task.title}
+                            </h4>
+
+                            {/* Marketing Specific Contact, Phone, and Location */}
+                            {isMarketing && (
+                              <div className="space-y-1 pt-0.5">
+                                {task.clientContact && (
+                                  <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-medium">
+                                    <UserIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                    <span className="truncate">{task.clientContact}</span>
+                                  </div>
+                                )}
+                                {task.clientPhone && (
+                                  <div className="flex items-center gap-1.5">
+                                    <a
+                                      href={`tel:${task.clientPhone}`}
+                                      onClick={e => e.stopPropagation()}
+                                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded border border-sky-100 transition-colors"
+                                      title="Click to dial client"
+                                    >
+                                      <Phone className="w-3 h-3 text-sky-600" />
+                                      <span>{task.clientPhone}</span>
+                                    </a>
+                                  </div>
+                                )}
+                                {task.clientLocation && (
+                                  <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                                    <MapPin className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                                    <span className="truncate">{task.clientLocation}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
 
                           {task.description && (
                             <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
@@ -511,8 +677,8 @@ export const TasksPage: React.FC = () => {
                                     ? `Past • ${task.dueDate}`
                                     : `Overdue • ${task.dueDate}`
                                   : isTodayVal
-                                  ? 'Due Today'
-                                  : `Due ${task.dueDate}`}
+                                  ? (isMarketing ? 'Meeting Today' : 'Due Today')
+                                  : `${isMarketing ? 'Meeting' : 'Due'} ${task.dueDate}`}
                               </span>
                               {task.createdAt && (
                                 <span className="text-[10px] text-slate-400 pl-4">
@@ -546,20 +712,70 @@ export const TasksPage: React.FC = () => {
                             )}
                           </div>
 
-                          {/* Discuss in Group Chat button for employees on their tasks */}
-                          {currentUser.role === 'employee' && task.assigneeId === currentUser.id && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDiscussInGroupChat(task);
-                              }}
-                              className="w-full mt-2.5 py-1.5 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/90 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                              title="Discuss this task in group chat"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
-                              <span>Discuss in Group Chat</span>
-                            </button>
+                          {/* 1-Click Stage Advance Buttons for Marketing */}
+                          {isMarketing && (
+                            <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                              {(task.status === 'calling' || task.status === 'todo') && (
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    updateTaskStatus(task.id, 'field_visit');
+                                  }}
+                                  className="w-full py-1.5 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>Advance to Field Visit</span>
+                                </button>
+                              )}
+                              {(task.status === 'field_visit' || task.status === 'in_progress') && (
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    updateTaskStatus(task.id, 'demo');
+                                  }}
+                                  className="w-full py-1.5 px-2.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  <Presentation className="w-3.5 h-3.5 text-purple-600" />
+                                  <span>Advance to Product Demo</span>
+                                </button>
+                              )}
+                              {(task.status === 'demo' || task.status === 'blocked') && (
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    updateTaskStatus(task.id, 'completed');
+                                  }}
+                                  className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>Mark Deal Closed / Won</span>
+                                </button>
+                              )}
+                              {task.status === 'completed' && (
+                                <div className="w-full py-1 px-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold flex items-center justify-center gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>Deal Closed / Won</span>
+                                </div>
+                              )}
+                            </div>
                           )}
+
+                          {/* Discuss in Group Chat button */}
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleDiscussInGroupChat(task);
+                            }}
+                            className="w-full py-1 px-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                            title={isMarketing ? 'Coordinate on this lead in marketing chat' : 'Discuss task in team chat'}
+                          >
+                            <MessageSquare className="w-3 h-3 text-slate-500" />
+                            <span>{isMarketing ? 'Discuss Lead in Chat' : 'Discuss in Group Chat'}</span>
+                          </button>
                         </div>
                       );
                     })
@@ -579,26 +795,24 @@ export const TasksPage: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <th className="py-3 px-4 w-12 text-center">Status</th>
-                  <th className="py-3 px-4">Task Deliverable</th>
-                  <th className="py-3 px-4">Task ID & Tags</th>
-                  <th className="py-3 px-4">Assignee</th>
+                  <th className="py-3 px-4">{isMarketing ? 'Client / Lead Name' : 'Task Deliverable'}</th>
+                  <th className="py-3 px-4">{isMarketing ? 'Contact & Location' : 'Task ID & Tags'}</th>
+                  <th className="py-3 px-4">{isMarketing ? 'Representative' : 'Assignee'}</th>
                   <th className="py-3 px-4">Priority</th>
-                  <th className="py-3 px-4">Deadline</th>
-                  {currentUser.role === 'employee' && (
-                    <th className="py-3 px-4 text-right">Discussion</th>
-                  )}
+                  <th className="py-3 px-4">{isMarketing ? 'Meeting Date' : 'Deadline'}</th>
+                  <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {sortedTasks.length === 0 ? (
                   <tr>
-                    <td colSpan={currentUser.role === 'employee' ? 7 : 6} className="py-8 text-center text-slate-400">
-                      No matching tasks found for the selected date scope and filters.
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      No matching {isMarketing ? 'client engagements' : 'tasks'} found for the selected date scope and filters.
                     </td>
                   </tr>
                 ) : (
                   sortedTasks.map(task => {
-                    const assignee = users.find(u => u.id === task.assigneeId);
+                    const assignee = findAssigneeUser(task.assigneeId);
                     const project = projects.find(p => p.id === task.projectId);
                     const isDone = task.status === 'completed';
                     const isPast = isPastDate(task.dueDate);
@@ -614,48 +828,75 @@ export const TasksPage: React.FC = () => {
                       >
                         <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>
                           <button
-                            onClick={() =>
-                              updateTaskStatus(
-                                task.id,
-                                isDone ? 'in_progress' : 'completed'
-                              )
-                            }
+                            onClick={() => {
+                              if (isMarketing) {
+                                if (task.status === 'calling' || task.status === 'todo') updateTaskStatus(task.id, 'field_visit');
+                                else if (task.status === 'field_visit' || task.status === 'in_progress') updateTaskStatus(task.id, 'demo');
+                                else if (task.status === 'demo' || task.status === 'blocked') updateTaskStatus(task.id, 'completed');
+                                else updateTaskStatus(task.id, 'calling');
+                              } else {
+                                updateTaskStatus(task.id, isDone ? 'in_progress' : 'completed');
+                              }
+                            }}
                             className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all mx-auto ${
                               isDone
                                 ? 'bg-emerald-600 border-emerald-600 text-white'
                                 : 'border-slate-300 hover:border-emerald-500 text-transparent'
                             }`}
-                            title={isDone ? 'Mark as In Progress' : 'Mark Complete'}
+                            title={isMarketing ? (isDone ? 'Reopen Lead' : 'Advance Stage') : (isDone ? 'Mark as In Progress' : 'Mark Complete')}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
 
                         <td className="py-3 px-4 font-semibold text-slate-900">
-                          <span className={isDone ? 'line-through text-slate-400' : ''}>
-                            {task.title}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-100">
-                              TASK-{task.id.replace('task-', '')}
+                          <div className="flex flex-col">
+                            <span className={isDone ? 'line-through text-slate-400' : ''}>
+                              {task.title}
                             </span>
                             {project && (
-                              <span
-                                className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
-                                title={`Project: ${project.name}`}
-                              >
-                                {project.key}
-                              </span>
-                            )}
-                            {task.tags && task.tags[0] && (
-                              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-medium">
-                                #{task.tags[0]}
+                              <span className="text-[10px] text-slate-400 mt-0.5">
+                                [{project.key}] {project.name}
                               </span>
                             )}
                           </div>
+                        </td>
+
+                        <td className="py-3 px-4">
+                          {isMarketing ? (
+                            <div className="flex flex-col gap-0.5">
+                              {task.clientContact && (
+                                <span className="font-medium text-slate-800">{task.clientContact}</span>
+                              )}
+                              {task.clientPhone && (
+                                <a
+                                  href={`tel:${task.clientPhone}`}
+                                  onClick={e => e.stopPropagation()}
+                                  className="text-[11px] text-sky-700 hover:underline flex items-center gap-1"
+                                >
+                                  <Phone className="w-3 h-3" />
+                                  <span>{task.clientPhone}</span>
+                                </a>
+                              )}
+                              {task.clientLocation && (
+                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-amber-600" />
+                                  <span className="truncate max-w-[180px]">{task.clientLocation}</span>
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-100">
+                                TASK-{task.id.replace('task-', '')}
+                              </span>
+                              {task.tags && task.tags[0] && (
+                                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-medium">
+                                  #{task.tags[0]}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         <td className="py-3 px-4">
@@ -702,7 +943,7 @@ export const TasksPage: React.FC = () => {
                               </span>
                               {isPast && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-800 border border-amber-200">
-                                  Previous Date
+                                  Previous
                                 </span>
                               )}
                               {isCurrentDay && (
@@ -719,20 +960,18 @@ export const TasksPage: React.FC = () => {
                           </div>
                         </td>
 
-                        {currentUser.role === 'employee' && (
-                          <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
-                            {task.assigneeId === currentUser.id && (
-                              <button
-                                onClick={() => handleDiscussInGroupChat(task)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-                                title="Discuss in Group Chat"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
-                                <span className="hidden sm:inline">Discuss in Group Chat</span>
-                              </button>
-                            )}
-                          </td>
-                        )}
+                        <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleDiscussInGroupChat(task)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Discuss in Group Chat"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
+                              <span className="hidden sm:inline">Discuss</span>
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })

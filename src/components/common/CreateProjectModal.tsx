@@ -24,6 +24,15 @@ export const CreateProjectModal: React.FC = () => {
     currentUser
   } = useApp();
 
+  const isMarketing = !!(currentUser.department && currentUser.department.toLowerCase().includes('market'));
+
+  const departmentUsers = users.filter(u => {
+    if (isMarketing) {
+      return u.department && u.department.toLowerCase().includes('market');
+    }
+    return !u.department || u.department.toLowerCase().includes('eng') || u.department.toLowerCase().includes('soft');
+  });
+
   const [name, setName] = useState('');
   const [key, setKey] = useState('');
   const [keyManuallyEdited, setKeyManuallyEdited] = useState(false);
@@ -81,15 +90,15 @@ export const CreateProjectModal: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentUser.role !== 'manager') {
-      setError('Only Managers are authorized to create new project initiatives.');
+      setError(isMarketing ? 'Only Marketing Managers are authorized to create new campaigns.' : 'Only Managers are authorized to create new project initiatives.');
       return;
     }
     if (!name.trim()) {
-      setError('Project name is required');
+      setError(isMarketing ? 'Campaign name is required' : 'Project name is required');
       return;
     }
     if (!key.trim()) {
-      setError('Project code key is required (e.g. SEC, INF)');
+      setError(isMarketing ? 'Campaign code key is required (e.g. MKT, MUM)' : 'Project code key is required (e.g. SEC, INF)');
       return;
     }
     if (!deadline) {
@@ -100,7 +109,7 @@ export const CreateProjectModal: React.FC = () => {
     createProject({
       name: name.trim(),
       key: key.trim().toUpperCase(),
-      description: description.trim() || 'Strategic software engineering initiative.',
+      description: description.trim() || (isMarketing ? 'Strategic marketing outreach and client acquisition campaign.' : 'Strategic software engineering initiative.'),
       health,
       deadline,
       members: selectedMemberIds.length > 0 ? selectedMemberIds : [currentUser.id],
@@ -127,9 +136,11 @@ export const CreateProjectModal: React.FC = () => {
                 <FolderPlus className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">Create New Project</h3>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                  {isMarketing ? 'Launch New Marketing Campaign' : 'Create New Project'}
+                </h3>
                 <p className="text-xs text-slate-500 truncate">
-                  Launch a new strategic initiative with deadline and team
+                  {isMarketing ? 'Launch an outreach drive, client acquisition initiative, or sales territory' : 'Launch a new strategic initiative with deadline and team'}
                 </p>
               </div>
             </div>
@@ -156,14 +167,14 @@ export const CreateProjectModal: React.FC = () => {
                   htmlFor="proj-name"
                   className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
                 >
-                  Project Name *
+                  {isMarketing ? 'Campaign / Territory Name *' : 'Project Name *'}
                 </label>
                 <input
                   id="proj-name"
                   type="text"
                   value={name}
                   onChange={e => handleNameChange(e.target.value)}
-                  placeholder="e.g., Global Zero-Trust Auth Architecture"
+                  placeholder={isMarketing ? 'e.g. Q4 Mumbai Healthcare & Corporate Outreach' : 'e.g., Global Zero-Trust Auth Architecture'}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-sm transition-all"
                   autoFocus
                 />
@@ -185,7 +196,7 @@ export const CreateProjectModal: React.FC = () => {
                     setKey(e.target.value.toUpperCase());
                     setKeyManuallyEdited(true);
                   }}
-                  placeholder="e.g. GZA"
+                  placeholder={isMarketing ? 'MKT' : 'GZA'}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-emerald-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-sm uppercase transition-all"
                 />
               </div>
@@ -197,14 +208,14 @@ export const CreateProjectModal: React.FC = () => {
                 htmlFor="proj-desc"
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
               >
-                Description & Business Objectives
+                {isMarketing ? 'Campaign Scope & Strategy' : 'Description & Business Objectives'}
               </label>
               <textarea
                 id="proj-desc"
                 rows={3}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder="Detail the target outcomes, architectural scope, and success milestones..."
+                placeholder={isMarketing ? 'Target client verticals, outreach targets, field demonstration territories...' : 'Detail the target outcomes, architectural scope, and success milestones...'}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-sm transition-all resize-none"
               />
             </div>
@@ -291,7 +302,7 @@ export const CreateProjectModal: React.FC = () => {
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {users.map(u => {
+                {departmentUsers.map(u => {
                   const isSelected = selectedMemberIds.includes(u.id);
                   return (
                     <div
@@ -347,7 +358,7 @@ export const CreateProjectModal: React.FC = () => {
                 className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm hover:shadow transition-all"
               >
                 <Sparkles className="w-4 h-4" />
-                Launch Project
+                {isMarketing ? 'Launch Campaign' : 'Launch Project'}
               </button>
             </div>
           </form>

@@ -111,19 +111,28 @@ export async function fetchProjectsFromSupabase(): Promise<Project[] | null> {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.map((row: any): Project => ({
-      id: row.id,
-      name: row.name,
-      key: row.key,
-      description: row.description || '',
-      health: row.health || 'on_track',
-      deadline: row.deadline || '',
-      members: Array.isArray(row.members) ? row.members : (typeof row.members === 'string' ? JSON.parse(row.members) : []),
-      progress: Number(row.progress) || 0,
-      department: row.department || 'Engineering',
-      lastUpdatedBy: row.last_updated_by,
-      lastUpdatedAt: row.last_updated_at
-    }));
+    return data.map((row: any): Project => {
+      const isMarketingProj =
+        row.id === 'proj-mkt-1' ||
+        String(row.id).includes('mkt') ||
+        row.key === 'MKT' ||
+        (row.name && (row.name.toLowerCase().includes('marketing') || row.name.toLowerCase().includes('campaign') || row.name.toLowerCase().includes('launch'))) ||
+        (row.department && row.department.toLowerCase().includes('market'));
+
+      return {
+        id: row.id,
+        name: row.name,
+        key: row.key,
+        description: row.description || '',
+        health: row.health || 'on_track',
+        deadline: row.deadline || '',
+        members: Array.isArray(row.members) ? row.members : (typeof row.members === 'string' ? JSON.parse(row.members) : []),
+        progress: Number(row.progress) || 0,
+        department: isMarketingProj ? 'Marketing' : (row.department || 'Engineering'),
+        lastUpdatedBy: row.last_updated_by,
+        lastUpdatedAt: row.last_updated_at
+      };
+    });
   } catch (e) {
     console.warn('[Supabase] fetchProjects error:', e);
     return null;
@@ -132,6 +141,14 @@ export async function fetchProjectsFromSupabase(): Promise<Project[] | null> {
 
 export async function upsertProjectToSupabase(project: Project): Promise<boolean> {
   try {
+    const isMkt =
+      project.id === 'proj-mkt-1' ||
+      project.id.includes('mkt') ||
+      project.key === 'MKT' ||
+      (project.department && project.department.toLowerCase().includes('market'));
+
+    const dept = isMkt ? 'Marketing' : (project.department || 'Engineering');
+
     const payload: any = {
       id: project.id,
       name: project.name,
@@ -141,7 +158,7 @@ export async function upsertProjectToSupabase(project: Project): Promise<boolean
       deadline: project.deadline,
       members: project.members,
       progress: project.progress,
-      department: project.department || 'Engineering',
+      department: dept,
       last_updated_by: project.lastUpdatedBy,
       last_updated_at: project.lastUpdatedAt
     };
@@ -152,9 +169,9 @@ export async function upsertProjectToSupabase(project: Project): Promise<boolean
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok && res.status === 400) {
-      // Graceful fallback if department column is not yet migrated in Supabase
-      const { department, ...fallbackPayload } = payload;
+    if (!res.ok) {
+      // Fallback: Strip custom columns if not yet migrated in Supabase
+      const { department, last_updated_by, last_updated_at, ...fallbackPayload } = payload;
       res = await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
         method: 'POST',
         headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
@@ -192,22 +209,87 @@ export async function fetchTasksFromSupabase(): Promise<Task[] | null> {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.map((row: any): Task => ({
-      id: row.id,
-      title: row.title,
-      description: row.description || '',
-      projectId: row.project_id || undefined,
-      assigneeId: row.assignee_id,
-      createdById: row.created_by_id,
-      priority: row.priority || 'medium',
-      status: row.status || 'todo',
-      dueDate: row.due_date,
-      tags: Array.isArray(row.tags) ? row.tags : (typeof row.tags === 'string' ? JSON.parse(row.tags) : []),
-      createdAt: row.created_at,
-      completedAt: row.completed_at || undefined,
-      estimatedHours: row.estimated_hours ? Number(row.estimated_hours) : undefined,
-      department: row.department || 'Engineering'
-    }));
+    return data.map((row: any): Task => {
+      const tags = Array.isArray(row.tags) ? row.tags : (typeof row.tags === 'string' ? JSON.parse(row.tags || '[]') : []);
+
+      const hasMarketingTag = tags.some((tg: string) => {
+        if (typeof tg !== 'string') return false;
+        const low = tg.toLowerCase();
+        return (
+          low.includes('calling') ||
+          low.includes('field visit') ||
+          low.includes('demo') ||
+          low.includes('lead') ||
+          low.includes('client') ||
+          low.includes('closed won') ||
+          low.startsWith('stage:')
+        );
+      });
+
+      // Comprehensive marketing detection across all signals
+      const isMkt =
+        (row.id && (String(row.id).startsWith('lead-') || String(row.id).includes('mkt'))) ||
+        ['calling', 'field_visit', 'demo'].includes(row.status) ||
+        !!row.client_contact ||
+        !!row.client_location ||
+        !!row.client_phone ||
+        row.assignee_id === 'user-marketing-emp' ||
+        (row.assignee_id && (row.assignee_id.toLowerCase().includes('aarav') || row.assignee_id.toLowerCase().includes('marketing'))) ||
+        row.created_by_id === 'user-marketing-mgr' ||
+        (row.created_by_id && (row.created_by_id.toLowerCase().includes('priya') || row.created_by_id.toLowerCase().includes('marketing'))) ||
+        (row.department && row.department.toLowerCase().includes('market')) ||
+        hasMarketingTag;
+
+      // If DB status was constrained to todo/in_progress, restore marketing stage from embedded stage tag
+      let resolvedStatus: TaskStatus = row.status || (isMkt ? 'calling' : 'todo');
+      const stageTag = tags.find((tg: string) => typeof tg === 'string' && tg.startsWith('stage:'));
+      if (stageTag) {
+        resolvedStatus = stageTag.slice('stage:'.length) as TaskStatus;
+      }
+
+      // Extract client details from metadata tags if row columns are null
+      const contactTag = tags.find((tg: string) => typeof tg === 'string' && tg.startsWith('mkt_contact:'));
+      const phoneTag = tags.find((tg: string) => typeof tg === 'string' && tg.startsWith('mkt_phone:'));
+      const locTag = tags.find((tg: string) => typeof tg === 'string' && tg.startsWith('mkt_loc:'));
+      const outcomeTag = tags.find((tg: string) => typeof tg === 'string' && tg.startsWith('mkt_outcome:'));
+
+      const resolvedContact = row.client_contact || (contactTag ? contactTag.slice('mkt_contact:'.length) : undefined);
+      const resolvedPhone = row.client_phone || (phoneTag ? phoneTag.slice('mkt_phone:'.length) : undefined);
+      const resolvedLocation = row.client_location || (locTag ? locTag.slice('mkt_loc:'.length) : undefined);
+      const resolvedOutcome = row.stage_outcome || (outcomeTag ? outcomeTag.slice('mkt_outcome:'.length) : undefined);
+
+      // Clean presentation tags (strip internal metadata tags so badges remain clean)
+      const cleanTags = tags.filter(
+        (tg: string) =>
+          typeof tg === 'string' &&
+          !tg.startsWith('stage:') &&
+          !tg.startsWith('mkt_contact:') &&
+          !tg.startsWith('mkt_phone:') &&
+          !tg.startsWith('mkt_loc:') &&
+          !tg.startsWith('mkt_outcome:')
+      );
+
+      return {
+        id: row.id,
+        title: row.title,
+        description: row.description || '',
+        projectId: row.project_id || undefined,
+        assigneeId: row.assignee_id,
+        createdById: row.created_by_id,
+        priority: row.priority || 'medium',
+        status: resolvedStatus,
+        dueDate: row.due_date,
+        tags: cleanTags,
+        createdAt: row.created_at,
+        completedAt: row.completed_at || undefined,
+        estimatedHours: row.estimated_hours ? Number(row.estimated_hours) : undefined,
+        department: isMkt ? 'Marketing' : (row.department || 'Engineering'),
+        clientContact: resolvedContact,
+        clientPhone: resolvedPhone,
+        clientLocation: resolvedLocation,
+        stageOutcome: resolvedOutcome
+      };
+    });
   } catch (e) {
     console.warn('[Supabase] fetchTasks error:', e);
     return null;
@@ -216,6 +298,44 @@ export async function fetchTasksFromSupabase(): Promise<Task[] | null> {
 
 export async function upsertTaskToSupabase(task: Task): Promise<boolean> {
   try {
+    const isMkt =
+      task.id.startsWith('lead-') ||
+      task.id.includes('mkt') ||
+      ['calling', 'field_visit', 'demo'].includes(task.status) ||
+      task.assigneeId === 'user-marketing-emp' ||
+      task.assigneeId.toLowerCase().includes('aarav') ||
+      task.assigneeId.toLowerCase().includes('marketing') ||
+      task.createdById === 'user-marketing-mgr' ||
+      task.createdById.toLowerCase().includes('priya') ||
+      task.createdById.toLowerCase().includes('marketing') ||
+      (task.department && task.department.toLowerCase().includes('market'));
+
+    const dept = isMkt ? 'Marketing' : (task.department || 'Engineering');
+
+    // Strip prior internal metadata tags from base tags
+    const cleanBaseTags = (task.tags || []).filter(
+      (tg: string) =>
+        typeof tg === 'string' &&
+        !tg.startsWith('stage:') &&
+        !tg.startsWith('mkt_contact:') &&
+        !tg.startsWith('mkt_phone:') &&
+        !tg.startsWith('mkt_loc:') &&
+        !tg.startsWith('mkt_outcome:')
+    );
+
+    // Dual-layer metadata encoding: Store client contact person, phone, location, outcome,
+    // and stage directly in tags array. This guarantees that even if Supabase table columns
+    // have not been migrated or are stripped on HTTP 400, every single piece of client information
+    // is permanently preserved and safely persisted in PostgreSQL!
+    const enrichedTags = Array.from(new Set([
+      ...cleanBaseTags,
+      isMkt ? `stage:${task.status}` : null,
+      task.clientContact ? `mkt_contact:${task.clientContact}` : null,
+      task.clientPhone ? `mkt_phone:${task.clientPhone}` : null,
+      task.clientLocation ? `mkt_loc:${task.clientLocation}` : null,
+      task.stageOutcome ? `mkt_outcome:${task.stageOutcome}` : null
+    ])).filter(Boolean) as string[];
+
     const payload: any = {
       id: task.id,
       title: task.title,
@@ -226,10 +346,14 @@ export async function upsertTaskToSupabase(task: Task): Promise<boolean> {
       priority: task.priority,
       status: task.status,
       due_date: task.dueDate,
-      tags: task.tags || [],
+      tags: enrichedTags,
       estimated_hours: task.estimatedHours || null,
       completed_at: task.completedAt || null,
-      department: task.department || 'Engineering'
+      department: dept,
+      client_contact: task.clientContact || null,
+      client_phone: task.clientPhone || null,
+      client_location: task.clientLocation || null,
+      stage_outcome: task.stageOutcome || null
     };
 
     let res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
@@ -238,14 +362,42 @@ export async function upsertTaskToSupabase(task: Task): Promise<boolean> {
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok && res.status === 400) {
-      // Graceful fallback if department column is not yet migrated in Supabase
-      const { department, ...fallbackPayload } = payload;
+    if (!res.ok) {
+      // Fallback 1: Strip client custom columns if not yet present in Supabase table
+      // Note: tags (with enriched metadata) is retained so no client data is lost!
+      const { client_contact, client_phone, client_location, stage_outcome, ...basicPayload } = payload;
       res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
         method: 'POST',
         headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
-        body: JSON.stringify(fallbackPayload)
+        body: JSON.stringify(basicPayload)
       });
+
+      if (!res.ok) {
+        // Fallback 2: Map status to valid constraint status 'in_progress' and drop department if rejected
+        const { department, ...fallbackPayload } = basicPayload;
+        const safeStatus = task.status === 'completed' ? 'completed' : 'in_progress';
+        res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
+          method: 'POST',
+          headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+          body: JSON.stringify({
+            ...fallbackPayload,
+            status: safeStatus
+          })
+        });
+
+        if (!res.ok) {
+          // Fallback 3: Drop project_id in case project foreign key fails
+          res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
+            method: 'POST',
+            headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+            body: JSON.stringify({
+              ...fallbackPayload,
+              project_id: null,
+              status: safeStatus
+            })
+          });
+        }
+      }
     }
 
     return res.ok;
@@ -278,20 +430,30 @@ export async function fetchUsersFromSupabase(): Promise<User[] | null> {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.map((row: any): User => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      username: row.username || (row.email ? row.email.split('@')[0] : row.id),
-      password: row.password || 'password123',
-      role: row.role || 'employee',
-      avatar: row.avatar || '',
-      title: row.title || '',
-      department: row.department || '',
-      presence: (row.presence as PresenceStatus) || 'online',
-      bio: row.bio || '',
-      phone: row.phone || undefined
-    }));
+    return data.map((row: any): User => {
+      const isMarketingUser =
+        row.id === 'user-marketing-mgr' ||
+        row.id === 'user-marketing-emp' ||
+        (row.email && (row.email.includes('marketing') || row.email.includes('aarav') || row.email.includes('priya'))) ||
+        (row.name && (row.name.includes('Priya') || row.name.includes('Aarav'))) ||
+        (row.title && (row.title.toLowerCase().includes('marketing') || row.title.toLowerCase().includes('growth'))) ||
+        (row.department && row.department.toLowerCase().includes('market'));
+
+      return {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        username: row.username || (row.email ? row.email.split('@')[0] : row.id),
+        password: row.password || 'password123',
+        role: row.role || 'employee',
+        avatar: row.avatar || '',
+        title: row.title || '',
+        department: isMarketingUser ? 'Marketing' : (row.department || 'Engineering'),
+        presence: (row.presence as PresenceStatus) || 'online',
+        bio: row.bio || '',
+        phone: row.phone || undefined
+      };
+    });
   } catch (e) {
     console.warn('[Supabase] fetchUsers error:', e);
     return null;
@@ -300,6 +462,18 @@ export async function fetchUsersFromSupabase(): Promise<User[] | null> {
 
 export async function upsertUserToSupabase(user: User): Promise<boolean> {
   try {
+    const isMarketingUser =
+      user.id === 'user-marketing-mgr' ||
+      user.id === 'user-marketing-emp' ||
+      user.email.includes('marketing') ||
+      user.email.includes('aarav') ||
+      user.email.includes('priya') ||
+      user.name.includes('Priya') ||
+      user.name.includes('Aarav') ||
+      (user.department && user.department.toLowerCase().includes('market'));
+
+    const dept = isMarketingUser ? 'Marketing' : (user.department || 'Engineering');
+
     const payload = {
       id: user.id,
       name: user.name,
@@ -307,17 +481,28 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
       role: user.role,
       avatar: user.avatar,
       title: user.title,
-      department: user.department,
+      department: dept,
       presence: user.presence,
       bio: user.bio,
       phone: user.phone || null
     };
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+    let res = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
       method: 'POST',
       headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
       body: JSON.stringify(payload)
     });
+
+    if (!res.ok) {
+      // Fallback: Strip optional columns if not in users table schema
+      const { department, phone, bio, ...basicUserPayload } = payload;
+      res = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+        method: 'POST',
+        headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+        body: JSON.stringify(basicUserPayload)
+      });
+    }
+
     return res.ok;
   } catch (e) {
     console.warn('[Supabase] upsertUser error:', e);

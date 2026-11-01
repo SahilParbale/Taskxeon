@@ -128,6 +128,11 @@ interface AppContextType {
     priority: TaskPriority;
     dueDate: string;
     tags?: string[];
+    status?: TaskStatus;
+    clientContact?: string;
+    clientPhone?: string;
+    clientLocation?: string;
+    stageOutcome?: string;
   }) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
@@ -166,12 +171,18 @@ const STORAGE_KEY = 'taskflow_v4';
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Active session deleted user tracker (in-memory only, no localStorage caching)
+  // Active session deleted user & task tracker (in-memory only, no localStorage caching)
   const [deletedUserIds, setDeletedUserIds] = useState<string[]>([]);
   const deletedUserIdsRef = useRef(deletedUserIds);
   useEffect(() => {
     deletedUserIdsRef.current = deletedUserIds;
   }, [deletedUserIds]);
+
+  const [deletedTaskIds, setDeletedTaskIds] = useState<string[]>([]);
+  const deletedTaskIdsRef = useRef(deletedTaskIds);
+  useEffect(() => {
+    deletedTaskIdsRef.current = deletedTaskIds;
+  }, [deletedTaskIds]);
 
   // Purge any legacy cached business data from browser localStorage to enforce pure cloud DB
   useEffect(() => {
@@ -210,8 +221,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [devPipelines] = useState<DevPipeline[]>(INITIAL_DEV_PIPELINES);
@@ -266,6 +277,97 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return 'engineering';
   };
 
+  // Resilient department resolver for any user object (protects against missing DB columns)
+  const getUserDepartment = (user?: { id?: string; email?: string; name?: string; username?: string; department?: string }): 'engineering' | 'marketing' => {
+    if (!user) return 'engineering';
+    if (user.id === 'user-marketing-mgr' || user.id === 'user-marketing-emp' || (user.id && user.id.includes('mkt'))) return 'marketing';
+    if (user.email && (user.email.includes('marketing') || user.email.includes('aarav') || user.email.includes('priya'))) return 'marketing';
+    if (user.name && (user.name.includes('Priya') || user.name.includes('Aarav'))) return 'marketing';
+    if (user.username && (user.username.includes('priya') || user.username.includes('aarav'))) return 'marketing';
+    return normalizeDepartment(user.department);
+  };
+
+  // Helper to match assignee to user across id, email, username, and personas
+  const isTaskAssignedToUser = (
+    task: { assigneeId: string },
+    user: { id: string; email?: string; name?: string; username?: string; role?: string; department?: string }
+  ): boolean => {
+    if (!task || !task.assigneeId || !user) return false;
+
+    const tAssignee = String(task.assigneeId).trim().toLowerCase();
+    const uId = String(user.id).trim().toLowerCase();
+    const uEmail = user.email ? user.email.trim().toLowerCase() : '';
+    const uName = user.name ? user.name.trim().toLowerCase() : '';
+    const uUsername = user.username ? user.username.trim().toLowerCase() : '';
+
+    // 1. Direct ID match
+    if (tAssignee === uId) return true;
+
+    // 2. Direct Email match
+    if (uEmail && tAssignee === uEmail) return true;
+
+    // 3. Direct Username match
+    if (uUsername && tAssignee === uUsername) return true;
+
+    // 4. Marketing Employee Persona match (Aarav Mehta) across all known aliases & IDs
+    const isUserAarav =
+      uId === 'user-marketing-emp' ||
+      uEmail.includes('aarav') ||
+      uName.includes('aarav') ||
+      uUsername === 'aarav';
+
+    const isTaskAssignedAarav =
+      tAssignee === 'user-marketing-emp' ||
+      tAssignee.includes('aarav') ||
+      tAssignee === 'aarav.mehta@taskflow.io';
+
+    if (isUserAarav && isTaskAssignedAarav) return true;
+
+    // 5. Software Dev Employee Persona match (Sahil Parbale) across all known aliases & IDs
+    const isUserSahil =
+      uId === 'user-2' ||
+      uEmail.includes('sahil') ||
+      uName.includes('sahil') ||
+      uUsername === 'sahil';
+
+    const isTaskAssignedSahil =
+      tAssignee === 'user-2' ||
+      tAssignee.includes('sahil') ||
+      tAssignee === 'sahilparbale@gmail.com';
+
+    if (isUserSahil && isTaskAssignedSahil) return true;
+
+    // 6. Marketing Manager Persona match (Priya Sharma)
+    const isUserPriya =
+      uId === 'user-marketing-mgr' ||
+      uEmail.includes('priya') ||
+      uName.includes('priya') ||
+      uUsername.includes('priya');
+
+    const isTaskAssignedPriya =
+      tAssignee === 'user-marketing-mgr' ||
+      tAssignee.includes('priya') ||
+      tAssignee === 'priya.marketing@taskflow.io';
+
+    if (isUserPriya && isTaskAssignedPriya) return true;
+
+    // 7. Software Manager Persona match (Shreyas Jadhav)
+    const isUserShreyas =
+      uId === 'user-1' ||
+      uEmail.includes('shreyas') ||
+      uName.includes('shreyas') ||
+      uUsername.includes('shreyas');
+
+    const isTaskAssignedShreyas =
+      tAssignee === 'user-1' ||
+      tAssignee.includes('shreyas') ||
+      tAssignee === 'shreyasjadhav@gmail.com';
+
+    if (isUserShreyas && isTaskAssignedShreyas) return true;
+
+    return false;
+  };
+
   // Current active user object with resilient ID resolution across aliases
   const currentUser = useMemo(() => {
     return (
@@ -277,29 +379,76 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   }, [users, currentUserId]);
 
-  // Current department based on authenticated user
+  // Current department based on authenticated user (resilient against missing DB column)
   const currentDept = useMemo(() => {
-    return normalizeDepartment(currentUser.department);
-  }, [currentUser.department]);
+    return getUserDepartment(currentUser);
+  }, [currentUser]);
 
   // Strict Department-Scoped Data Partitioning (Zero cross-department leaking)
   const scopedUsers = useMemo(() => {
-    return users.filter(u => normalizeDepartment(u.department) === currentDept);
+    return users.filter(u => getUserDepartment(u) === currentDept);
   }, [users, currentDept]);
 
   const scopedProjects = useMemo(() => {
     return projects.filter(p => {
-      if (p.department) return normalizeDepartment(p.department) === currentDept;
-      const firstMember = users.find(u => p.members?.includes(u.id));
-      return firstMember ? normalizeDepartment(firstMember.department) === currentDept : currentDept === 'engineering';
+      const isMkt =
+        p.id === 'proj-mkt-1' ||
+        p.id.includes('mkt') ||
+        p.key === 'MKT' ||
+        (p.department && normalizeDepartment(p.department) === 'marketing');
+
+      if (currentDept === 'marketing') return isMkt;
+      return !isMkt;
     });
-  }, [projects, users, currentDept]);
+  }, [projects, currentDept]);
 
   const scopedTasks = useMemo(() => {
     return tasks.filter(t => {
-      if (t.department) return normalizeDepartment(t.department) === currentDept;
-      const assignee = users.find(u => u.id === t.assigneeId || u.id === t.createdById);
-      return assignee ? normalizeDepartment(assignee.department) === currentDept : currentDept === 'engineering';
+      // 1. Direct lead / marketing pipeline characteristics:
+      const hasMarketingStatus = ['calling', 'field_visit', 'demo'].includes(t.status);
+      const isLeadId = t.id && (t.id.startsWith('lead-') || t.id.includes('mkt'));
+      const hasClientData = !!t.clientContact || !!t.clientLocation || !!t.clientPhone;
+      const isExplicitMkt = t.department && normalizeDepartment(t.department) === 'marketing';
+
+      const tAssignee = (t.assigneeId || '').toLowerCase();
+      const tCreator = (t.createdById || '').toLowerCase();
+
+      const assigneeUser = users.find(u =>
+        u.id === t.assigneeId ||
+        (u.email && u.email.toLowerCase() === tAssignee) ||
+        (u.username && u.username.toLowerCase() === tAssignee)
+      );
+      const creatorUser = users.find(u =>
+        u.id === t.createdById ||
+        (u.email && u.email.toLowerCase() === tCreator) ||
+        (u.username && u.username.toLowerCase() === tCreator)
+      );
+
+      const assigneeIsMarketing =
+        (assigneeUser && getUserDepartment(assigneeUser) === 'marketing') ||
+        tAssignee === 'user-marketing-emp' ||
+        tAssignee.includes('aarav') ||
+        tAssignee.includes('marketing');
+
+      const creatorIsMarketing =
+        (creatorUser && getUserDepartment(creatorUser) === 'marketing') ||
+        tCreator === 'user-marketing-mgr' ||
+        tCreator.includes('priya') ||
+        tCreator.includes('marketing');
+
+      const isMarketingTask =
+        hasMarketingStatus ||
+        isLeadId ||
+        hasClientData ||
+        isExplicitMkt ||
+        assigneeIsMarketing ||
+        creatorIsMarketing;
+
+      if (currentDept === 'marketing') {
+        return isMarketingTask;
+      } else {
+        return !isMarketingTask;
+      }
     });
   }, [tasks, users, currentDept]);
 
@@ -431,9 +580,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Sync Tasks & Ring Notification for newly assigned tasks
         if (cloudTasks) {
           setTasks(prevTasks => {
+            const existingTaskMap = new Map(prevTasks.map(t => [t.id, t]));
+            // Hydrate cloud tasks: if cloud had null client fields, preserve local values so they never flash or vanish
+            const hydratedCloudTasks = cloudTasks.map(ct => {
+              const local = existingTaskMap.get(ct.id);
+              if (!local) return ct;
+              return {
+                ...ct,
+                clientContact: ct.clientContact || local.clientContact,
+                clientPhone: ct.clientPhone || local.clientPhone,
+                clientLocation: ct.clientLocation || local.clientLocation,
+                stageOutcome: ct.stageOutcome || local.stageOutcome
+              };
+            });
+
+            const cloudIds = new Set(hydratedCloudTasks.map(t => t.id));
+            // Preserve all local tasks not yet confirmed in cloudTasks, unless explicitly deleted
+            const localPending = prevTasks.filter(t => {
+              if (cloudIds.has(t.id)) return false;
+              if (deletedTaskIdsRef.current.includes(t.id)) return false;
+              return true;
+            });
+
+            // Re-attempt background sync for any local pending tasks not yet in Supabase
+            if (localPending.length > 0) {
+              localPending.forEach(lt => upsertTaskToSupabase(lt).catch(() => {}));
+            }
+
+            // Ensure marketing default sample tasks are seeded if no marketing tasks exist in the database yet
+            const hasMarketingTask = [...hydratedCloudTasks, ...localPending].some(t =>
+              (t.id && (t.id.startsWith('lead-') || t.id.includes('mkt'))) ||
+              ['calling', 'field_visit', 'demo'].includes(t.status) ||
+              (t.department && t.department.toLowerCase().includes('market'))
+            );
+
+            const mktDefaults = !hasMarketingTask
+              ? INITIAL_TASKS.filter(it => it.department === 'Marketing' && !cloudIds.has(it.id))
+              : [];
+
+            if (!hasMarketingTask && mktDefaults.length > 0) {
+              mktDefaults.forEach(mt => upsertTaskToSupabase(mt).catch(() => {}));
+            }
+
             if (isSilent) {
               const prevIds = new Set(prevTasks.map(t => t.id));
-              const newlyAssigned = cloudTasks.filter(t => !prevIds.has(t.id) && t.assigneeId === currentUserId);
+              const newlyAssigned = hydratedCloudTasks.filter(t => !prevIds.has(t.id) && isTaskAssignedToUser(t, currentUserRef.current));
               if (newlyAssigned.length > 0) {
                 soundManager.play('ring');
                 newlyAssigned.forEach(nt => {
@@ -445,13 +636,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 });
               }
             }
-            return cloudTasks;
+            return [...hydratedCloudTasks, ...localPending, ...mktDefaults];
           });
         }
 
         // Sync Projects
         if (cloudProjects) {
-          setProjects(cloudProjects);
+          const hasMarketingProj = cloudProjects.some(p =>
+            (p.department && p.department.toLowerCase().includes('market')) || p.id.includes('mkt')
+          );
+          const mktProjDefaults = !hasMarketingProj
+            ? INITIAL_PROJECTS.filter(ip => ip.department === 'Marketing' && !cloudProjects.some(p => p.id === ip.id))
+            : [];
+          if (!hasMarketingProj && mktProjDefaults.length > 0) {
+            mktProjDefaults.forEach(mp => upsertProjectToSupabase(mp).catch(() => {}));
+          }
+          setProjects([...cloudProjects, ...mktProjDefaults]);
         }
 
         // Sync Activities
@@ -544,7 +744,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (prev.some(t => t.id === newTask.id)) return prev;
             return [newTask, ...prev];
           });
-          if (newTask.assigneeId === currentUserIdRef.current && !isSelf(newTask.createdById)) {
+          if (isTaskAssignedToUser(newTask, currentUserRef.current) && !isSelf(newTask.createdById)) {
             soundManager.play('ring');
             dispatchSystemNotification('New Task Assigned', {
               body: `Manager assigned you: "${newTask.title}"`,
@@ -1004,13 +1204,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     priority: TaskPriority;
     dueDate: string;
     tags?: string[];
+    status?: TaskStatus;
+    clientContact?: string;
+    clientPhone?: string;
+    clientLocation?: string;
+    stageOutcome?: string;
   }) => {
     if (currentUser.role !== 'manager') {
       addToast('Permission Denied', 'Employees are not authorized to create or assign tasks. Switch to Manager role to assign work.', 'warning');
       return;
     }
 
-    const newTaskId = `task-${Date.now()}`;
+    const isMarketingUser = (currentUser.department || '').toLowerCase().includes('market') || currentDept === 'marketing';
+    const defaultStatus: TaskStatus = data.status || (isMarketingUser ? 'calling' : 'todo');
+
+    const newTaskId = isMarketingUser ? `lead-${Date.now()}` : `task-${Date.now()}`;
     const newTask: Task = {
       id: newTaskId,
       title: data.title,
@@ -1019,11 +1227,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       assigneeId: data.assigneeId,
       createdById: currentUser.id,
       priority: data.priority,
-      status: 'todo',
+      status: defaultStatus,
       dueDate: data.dueDate,
       createdAt: new Date().toISOString(),
-      tags: data.tags || [],
-      department: currentUser.department || (currentDept === 'marketing' ? 'Marketing' : 'Engineering')
+      tags: data.tags || (isMarketingUser ? [defaultStatus === 'calling' ? 'Calling' : defaultStatus === 'field_visit' ? 'Field Visit' : 'Product Demo'] : []),
+      department: isMarketingUser ? 'Marketing' : 'Engineering',
+      clientContact: data.clientContact,
+      clientPhone: data.clientPhone,
+      clientLocation: data.clientLocation,
+      stageOutcome: data.stageOutcome
     };
 
     setTasks(prev => [newTask, ...prev]);
@@ -1232,6 +1444,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Delete task
   const deleteTask = (taskId: string) => {
+    setDeletedTaskIds(prev => Array.from(new Set([...prev, taskId])));
     const task = tasks.find(t => t.id === taskId);
     setTasks(prev => prev.filter(t => t.id !== taskId));
     deleteTaskFromSupabase(taskId);
@@ -1507,8 +1720,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Tasks assigned to current user
   const assignedTasks = useMemo(() => {
-    return tasks.filter(t => t.assigneeId === currentUser.id);
-  }, [tasks, currentUser.id]);
+    return tasks.filter(t => isTaskAssignedToUser(t, currentUser));
+  }, [tasks, currentUser]);
 
   return (
     <AppContext.Provider

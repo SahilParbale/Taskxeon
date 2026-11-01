@@ -12,7 +12,8 @@ import {
   MessageSquare,
   LogOut,
   Search,
-  ChevronDown
+  ChevronDown,
+  PhoneCall
 } from 'lucide-react';
 
 export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
@@ -28,6 +29,53 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
     setIsSearchOpen,
     setUserPresence
   } = useApp();
+
+  const isMarketing = currentUser.department && currentUser.department.toLowerCase().includes('market');
+
+  const isTaskAssignedToUser = (
+    task: { assigneeId: string },
+    user: { id: string; email?: string; name?: string; username?: string }
+  ): boolean => {
+    if (!task || !task.assigneeId || !user) return false;
+
+    const tAssignee = String(task.assigneeId).trim().toLowerCase();
+    const uId = String(user.id).trim().toLowerCase();
+    const uEmail = user.email ? user.email.trim().toLowerCase() : '';
+    const uName = user.name ? user.name.trim().toLowerCase() : '';
+    const uUsername = user.username ? user.username.trim().toLowerCase() : '';
+
+    if (tAssignee === uId) return true;
+    if (uEmail && tAssignee === uEmail) return true;
+    if (uUsername && tAssignee === uUsername) return true;
+
+    const isUserAarav =
+      uId === 'user-marketing-emp' ||
+      uEmail.includes('aarav') ||
+      uName.includes('aarav') ||
+      uUsername === 'aarav';
+
+    const isTaskAssignedAarav =
+      tAssignee === 'user-marketing-emp' ||
+      tAssignee.includes('aarav') ||
+      tAssignee === 'aarav.mehta@taskflow.io';
+
+    if (isUserAarav && isTaskAssignedAarav) return true;
+
+    const isUserSahil =
+      uId === 'user-2' ||
+      uEmail.includes('sahil') ||
+      uName.includes('sahil') ||
+      uUsername === 'sahil';
+
+    const isTaskAssignedSahil =
+      tAssignee === 'user-2' ||
+      tAssignee.includes('sahil') ||
+      tAssignee === 'sahilparbale@gmail.com';
+
+    if (isUserSahil && isTaskAssignedSahil) return true;
+
+    return false;
+  };
 
   const [isPresenceOpen, setIsPresenceOpen] = useState(false);
   const presenceRef = useRef<HTMLDivElement>(null);
@@ -60,10 +108,12 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
     },
     {
       id: 'tasks',
-      label: currentUser.role === 'employee' ? 'My Tasks' : 'All Tasks',
-      icon: <CheckSquare className="w-4 h-4" />,
+      label: isMarketing
+        ? (currentUser.role === 'employee' ? 'My Calls & Visits' : 'Calls, Visits & Demos')
+        : (currentUser.role === 'employee' ? 'My Tasks' : 'All Tasks'),
+      icon: isMarketing ? <PhoneCall className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />,
       badge: (currentUser.role === 'employee'
-        ? tasks.filter(t => t.assigneeId === currentUser.id && t.status !== 'completed')
+        ? tasks.filter(t => isTaskAssignedToUser(t, currentUser) && t.status !== 'completed')
         : tasks.filter(t => t.status !== 'completed')
       ).length
     },

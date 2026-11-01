@@ -55,7 +55,7 @@ export const RoleSwitcherModal: React.FC = () => {
         'Mark tasks complete with confetti feedback',
         'Direct project delivery & messaging'
       ],
-      user: users.find(u => u.role === 'employee' && u.name.includes('Alex')) || users[1]
+      user: users.find(u => u.role === 'employee') || users[0]
     }
   ];
 

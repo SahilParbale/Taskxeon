@@ -18,7 +18,11 @@ import {
   Layers,
   Terminal,
   ShieldCheck,
-  MessageSquare
+  MessageSquare,
+  Phone,
+  PhoneCall,
+  MapPin,
+  Presentation
 } from 'lucide-react';
 import { getTodayDateString, isPastDate, isUpcomingDate, formatTodayDisplay } from '../lib/dateUtils';
 
@@ -40,10 +44,12 @@ export const Dashboard: React.FC = () => {
     sendMessage
   } = useApp();
 
+  const isMarketing = !!(currentUser.department && currentUser.department.toLowerCase().includes('market'));
+
   const [managerTaskFilter, setManagerTaskFilter] = React.useState<'all' | 'previous' | 'upcoming'>('all');
   const [employeeTaskFilter, setEmployeeTaskFilter] = React.useState<'all' | 'previous' | 'active'>('all');
 
-  // Metric computations
+  // Metric computations for Software Engineering
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
@@ -53,6 +59,12 @@ export const Dashboard: React.FC = () => {
   ).length;
 
   const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // Metric computations for Marketing Client & Field Operations Pipeline
+  const callingLeadsCount = tasks.filter(t => t.status === 'calling' || t.status === 'todo').length;
+  const fieldVisitsCount = tasks.filter(t => t.status === 'field_visit' || t.status === 'in_progress').length;
+  const demosCount = tasks.filter(t => t.status === 'demo' || t.status === 'blocked').length;
+  const closedDealsCount = tasks.filter(t => t.status === 'completed').length;
 
   // Team presence stats (employees only)
   const employeeUsers = users.filter(u => u.role === 'employee');
@@ -75,7 +87,7 @@ export const Dashboard: React.FC = () => {
               Overview
             </h1>
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-semibold text-xs border border-emerald-200">
-              {currentUser.department && currentUser.department.toLowerCase().includes('market') ? 'Marketing Workspace' : 'Software Workspace'}
+              {isMarketing ? 'Marketing & Field Workspace' : 'Software Engineering Workspace'}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
@@ -89,104 +101,170 @@ export const Dashboard: React.FC = () => {
             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs shadow-sm transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 text-emerald-700" />
-            <span>{currentUser.department && currentUser.department.toLowerCase().includes('market') ? 'New Campaign' : 'New Project'}</span>
+            <span>{isMarketing ? 'New Campaign' : 'New Project'}</span>
           </button>
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Assign New Task</span>
+            {isMarketing ? <PhoneCall className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            <span>{isMarketing ? 'Schedule Client Lead' : 'Assign New Task'}</span>
           </button>
         </div>
       </div>
 
       {/* Primary Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Tasks & Rate */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Completion Rate</span>
-            <TrendingUp className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 tabular-nums">
-              {overallProgress}%
-            </span>
-            <span className="text-xs text-slate-500">
-              ({completedTasks}/{totalTasks} tasks)
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
-            <div
-              className="bg-emerald-600 h-full rounded-full transition-all duration-500"
-              style={{ width: `${overallProgress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* In Progress */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">In Progress</span>
-            <Clock className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 tabular-nums">
-              {inProgressTasks}
-            </span>
-            <span className="text-xs text-emerald-700 font-medium">Active work</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">Under active development</p>
-        </div>
-
-        {/* At Risk / Overdue */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Blocked & Overdue</span>
-            <AlertTriangle className="w-4 h-4 text-rose-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-rose-600 tabular-nums">
-              {blockedTasks + overdueTasks}
-            </span>
-            <span className="text-xs text-rose-700 font-medium">Needs Attention</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            {blockedTasks} blocked, {overdueTasks} overdue
-          </p>
-        </div>
-
-        {/* Team Availability */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Team Presence</span>
-            <Users className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-sm font-bold text-slate-800">{onlineCount}</span>
-              <span className="text-[11px] text-slate-400">Online</span>
+        {isMarketing ? (
+          <>
+            {/* Calling Pipeline */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Outreach & Calling</span>
+                <Phone className="w-4 h-4 text-sky-600" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {callingLeadsCount}
+                </span>
+                <span className="text-xs text-sky-700 font-medium">Initial contacts</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Telephone qualification & cold outreach</p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-sm font-bold text-slate-800">{breakCount}</span>
-              <span className="text-[11px] text-slate-400">Break</span>
+
+            {/* Field Visits */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Field Visits</span>
+                <MapPin className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {fieldVisitsCount}
+                </span>
+                <span className="text-xs text-amber-700 font-medium">On-site meetings</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Scheduled face-to-face visits</p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-slate-300" />
-              <span className="text-sm font-bold text-slate-800">{offlineCount}</span>
-              <span className="text-[11px] text-slate-400">Away</span>
+
+            {/* Product Demos */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Product Demos</span>
+                <Presentation className="w-4 h-4 text-purple-600" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {demosCount}
+                </span>
+                <span className="text-xs text-purple-700 font-medium">Live pitches</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Live solution demonstrations</p>
             </div>
-          </div>
-          <button
-            onClick={() => setCurrentView('team')}
-            className="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold mt-2 inline-flex items-center gap-1"
-          >
-            View directory <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
+
+            {/* Deals Won */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Closed / Won</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-emerald-700 tabular-nums">
+                  {closedDealsCount}
+                </span>
+                <span className="text-xs text-emerald-800 font-medium">Converted accounts</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Contracts finalized & accounts won</p>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Total Tasks & Rate */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Completion Rate</span>
+                <TrendingUp className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {overallProgress}%
+                </span>
+                <span className="text-xs text-slate-500">
+                  ({completedTasks}/{totalTasks} tasks)
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
+                <div
+                  className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${overallProgress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* In Progress */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">In Progress</span>
+                <Clock className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {inProgressTasks}
+                </span>
+                <span className="text-xs text-emerald-700 font-medium">Active work</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Under active development</p>
+            </div>
+
+            {/* At Risk / Overdue */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Blocked & Overdue</span>
+                <AlertTriangle className="w-4 h-4 text-rose-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-rose-600 tabular-nums">
+                  {blockedTasks + overdueTasks}
+                </span>
+                <span className="text-xs text-rose-700 font-medium">Needs Attention</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                {blockedTasks} blocked, {overdueTasks} overdue
+              </p>
+            </div>
+
+            {/* Team Availability */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-soft">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Team Presence</span>
+                <Users className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-sm font-bold text-slate-800">{onlineCount}</span>
+                  <span className="text-[11px] text-slate-400">Online</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-sm font-bold text-slate-800">{breakCount}</span>
+                  <span className="text-[11px] text-slate-400">Break</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-300" />
+                  <span className="text-sm font-bold text-slate-800">{offlineCount}</span>
+                  <span className="text-[11px] text-slate-400">Away</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setCurrentView('team')}
+                className="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold mt-2 inline-flex items-center gap-1"
+              >
+                View directory <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Project Health Cards Grid */}
@@ -383,7 +461,18 @@ export const Dashboard: React.FC = () => {
                     return true;
                   })
                   .map(t => {
-                    const assignee = users.find(u => u.id === t.assigneeId);
+                    const assignee =
+                      users.find(u =>
+                        u.id === t.assigneeId ||
+                        (u.email && u.email.toLowerCase() === (t.assigneeId || '').toLowerCase()) ||
+                        (u.username && u.username.toLowerCase() === (t.assigneeId || '').toLowerCase())
+                      ) ||
+                      (t.assigneeId === 'user-marketing-emp' || (t.assigneeId || '').toLowerCase().includes('aarav')
+                        ? users.find(u => u.id === 'user-marketing-emp' || u.email.includes('aarav') || u.name.includes('Aarav'))
+                        : undefined) ||
+                      (t.assigneeId === 'user-2' || (t.assigneeId || '').toLowerCase().includes('sahil')
+                        ? users.find(u => u.id === 'user-2' || u.email.includes('sahil') || u.name.includes('Sahil'))
+                        : undefined);
                     const isPast = isPastDate(t.dueDate);
                     return (
                       <div
@@ -420,7 +509,7 @@ export const Dashboard: React.FC = () => {
                             </p>
                             <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400 flex-wrap">
                               <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-100">
-                                TASK-{t.id.replace('task-', '')}
+                                {isMarketing ? `LEAD-${t.id.replace('lead-', '').replace('task-', '')}` : `TASK-${t.id.replace('task-', '')}`}
                               </span>
                               <span>•</span>
                               {t.createdAt && (
@@ -430,7 +519,7 @@ export const Dashboard: React.FC = () => {
                                 </>
                               )}
                               <span className={isPast && t.status !== 'completed' ? 'text-rose-600 font-semibold' : ''}>
-                                Due {t.dueDate}
+                                {isMarketing ? 'Meeting' : 'Due'} {t.dueDate}
                                 {isPast && ' (Previous)'}
                               </span>
                             </div>
@@ -446,14 +535,17 @@ export const Dashboard: React.FC = () => {
                             <button
                               onClick={e => {
                                 e.stopPropagation();
+                                const channel = isMarketing ? 'ch-marketing' : 'ch-engineering';
                                 sendMessage(
-                                  `Let's discuss task "${t.title}" (Due: ${t.dueDate} | Priority: ${t.priority.toUpperCase()})`,
-                                  'ch-team-chat'
+                                  isMarketing
+                                    ? `Let's coordinate on lead "${t.title}" (Stage: ${t.status.toUpperCase()} | Meeting: ${t.dueDate})`
+                                    : `Let's discuss task "${t.title}" (Due: ${t.dueDate} | Priority: ${t.priority.toUpperCase()})`,
+                                  channel
                                 );
                                 setCurrentView('messages');
                               }}
                               className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                              title="Discuss in Group Chat"
+                              title="Discuss in Chat"
                             >
                               <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
                               <span className="hidden sm:inline">Discuss</span>
@@ -537,7 +629,7 @@ export const Dashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Employee Workspace
+              {isMarketing ? 'Marketing & Field Operations Workspace' : 'Employee Workspace'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Good day, {currentUser.name} • {todayFormatted}
@@ -554,7 +646,7 @@ export const Dashboard: React.FC = () => {
                 <button
                   key={st}
                   onClick={() => setUserPresence(st)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer ${
                     currentUser.presence === st
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100'
@@ -571,10 +663,10 @@ export const Dashboard: React.FC = () => {
         {activeAssigned.length > 0 && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Sparkles className="w-5 h-5 text-emerald-700" />
+              {isMarketing ? <PhoneCall className="w-5 h-5 text-emerald-700" /> : <Sparkles className="w-5 h-5 text-emerald-700" />}
               <div>
                 <p className="text-xs font-bold text-emerald-950">
-                  You have {activeAssigned.length} active assigned deliverable{activeAssigned.length === 1 ? '' : 's'}!
+                  You have {activeAssigned.length} active scheduled {isMarketing ? 'client engagement' : 'deliverable'}{activeAssigned.length === 1 ? '' : 's'}!
                 </p>
                 <p className="text-xs text-emerald-800">
                   Priority: "{activeAssigned[0].title}"
@@ -583,9 +675,9 @@ export const Dashboard: React.FC = () => {
             </div>
             <button
               onClick={() => setSelectedTaskId(activeAssigned[0].id)}
-              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1"
+              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1 cursor-pointer"
             >
-              Open Task <ArrowRight className="w-3 h-3" />
+              <span>{isMarketing ? 'Open Lead' : 'Open Task'}</span> <ArrowRight className="w-3 h-3" />
             </button>
           </div>
         )}
@@ -594,9 +686,11 @@ export const Dashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-soft overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold text-slate-900">Your Deliverables</h2>
+              <h2 className="text-sm font-bold text-slate-900">
+                {isMarketing ? 'Your Client Pipeline & Field Schedule' : 'Your Deliverables'}
+              </h2>
               <p className="text-xs text-slate-500">
-                {assignedTasks.filter(t => t.status === 'completed').length} of {assignedTasks.length} tasks completed
+                {assignedTasks.filter(t => t.status === 'completed').length} of {assignedTasks.length} {isMarketing ? 'deals closed' : 'tasks completed'}
               </p>
             </div>
 
@@ -604,7 +698,7 @@ export const Dashboard: React.FC = () => {
             <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
               <button
                 onClick={() => setEmployeeTaskFilter('all')}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   employeeTaskFilter === 'all'
                     ? 'bg-white text-slate-900 shadow-sm font-bold'
                     : 'text-slate-600 hover:text-slate-900'
@@ -614,18 +708,18 @@ export const Dashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setEmployeeTaskFilter('previous')}
-                className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
                   employeeTaskFilter === 'previous'
                     ? 'bg-white text-amber-900 shadow-sm font-bold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Clock className="w-3 h-3 text-amber-600" />
-                Previous Assigned ({assignedTasks.filter(t => isPastDate(t.dueDate)).length})
+                <span>Previous ({assignedTasks.filter(t => isPastDate(t.dueDate)).length})</span>
               </button>
               <button
                 onClick={() => setEmployeeTaskFilter('active')}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   employeeTaskFilter === 'active'
                     ? 'bg-white text-emerald-900 shadow-sm font-bold'
                     : 'text-slate-600 hover:text-slate-900'
@@ -637,18 +731,22 @@ export const Dashboard: React.FC = () => {
 
             <button
               onClick={() => setCurrentView('tasks')}
-              className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+              className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
             >
-              Open Full Task Board <ArrowRight className="w-3 h-3" />
+              <span>{isMarketing ? 'Open Full Pipeline Board' : 'Open Full Task Board'}</span> <ArrowRight className="w-3 h-3" />
             </button>
           </div>
 
           <div className="divide-y divide-slate-100 max-h-[460px] overflow-y-auto">
             {assignedTasks.length === 0 ? (
               <div className="p-8 text-center">
-                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-                <p className="text-sm font-bold text-slate-800">No active tasks assigned</p>
-                <p className="text-xs text-slate-500">You are completely caught up!</p>
+                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2 opacity-60" />
+                <p className="text-sm font-bold text-slate-800">
+                  {isMarketing ? 'No client visits or calls scheduled' : 'No active tasks assigned'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {isMarketing ? 'Check back soon for new outreach assignments.' : 'You are completely caught up!'}
+                </p>
               </div>
             ) : (
               assignedTasks
@@ -672,17 +770,21 @@ export const Dashboard: React.FC = () => {
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            updateTaskStatus(
-                              task.id,
-                              isDone ? 'in_progress' : 'completed'
-                            );
+                            if (isMarketing) {
+                              if (task.status === 'calling' || task.status === 'todo') updateTaskStatus(task.id, 'field_visit');
+                              else if (task.status === 'field_visit' || task.status === 'in_progress') updateTaskStatus(task.id, 'demo');
+                              else if (task.status === 'demo' || task.status === 'blocked') updateTaskStatus(task.id, 'completed');
+                              else updateTaskStatus(task.id, 'calling');
+                            } else {
+                              updateTaskStatus(task.id, isDone ? 'in_progress' : 'completed');
+                            }
                           }}
                           className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
                             isDone
                               ? 'bg-emerald-600 border-emerald-600 text-white'
                               : 'border-slate-300 hover:border-emerald-500 text-transparent'
                           }`}
-                          title={isDone ? 'Mark as In Progress' : 'Click to complete task!'}
+                          title={isMarketing ? (isDone ? 'Reopen Lead' : 'Advance Stage') : (isDone ? 'Mark as In Progress' : 'Click to complete task')}
                         >
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
@@ -697,7 +799,7 @@ export const Dashboard: React.FC = () => {
                           </p>
                           <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
                             <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-100">
-                              TASK-{task.id.replace('task-', '')}
+                              {isMarketing ? `LEAD-${task.id.replace('lead-', '').replace('task-', '')}` : `TASK-${task.id.replace('task-', '')}`}
                             </span>
                             <span>•</span>
                             {task.createdAt && (
@@ -707,7 +809,7 @@ export const Dashboard: React.FC = () => {
                               </>
                             )}
                             <span className={isPast && !isDone ? 'text-rose-600 font-bold' : ''}>
-                              Due {task.dueDate}
+                              {isMarketing ? 'Meeting' : 'Due'} {task.dueDate}
                               {isPast && ' (Previous Date)'}
                             </span>
                           </div>
