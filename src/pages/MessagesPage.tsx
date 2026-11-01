@@ -41,8 +41,6 @@ export const MessagesPage: React.FC = () => {
     setIsCreateModalOpen
   } = useApp();
 
-  // Sidebar category filter: 'all' | 'team' | 'personal'
-  const [sidebarFilter, setSidebarFilter] = useState<'all' | 'team' | 'personal'>('all');
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [inputText, setInputText] = useState('');
   const [inThreadSearch, setInThreadSearch] = useState('');
@@ -229,44 +227,8 @@ export const MessagesPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Category Switcher Tabs: All | Team Chat | Personal DMs */}
-        <div className="p-3 border-b border-slate-100 bg-slate-50/70 space-y-2 flex-shrink-0">
-          <div className="flex rounded-xl bg-slate-200/70 p-1 text-xs font-semibold">
-            <button
-              onClick={() => setSidebarFilter('all')}
-              className={`flex-1 py-1.5 rounded-lg transition-all text-center ${
-                sidebarFilter === 'all'
-                  ? 'bg-white text-slate-900 font-bold shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setSidebarFilter('team')}
-              className={`flex-1 py-1.5 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
-                sidebarFilter === 'team'
-                  ? 'bg-white text-emerald-800 font-bold shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Hash className="w-3 h-3 text-emerald-700" />
-              <span>Team</span>
-            </button>
-            <button
-              onClick={() => setSidebarFilter('personal')}
-              className={`flex-1 py-1.5 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
-                sidebarFilter === 'personal'
-                  ? 'bg-white text-emerald-800 font-bold shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Lock className="w-3 h-3 text-emerald-700" />
-              <span>Personal</span>
-            </button>
-          </div>
-
-          {/* Quick Search across chats */}
+        {/* Quick Search across chats */}
+        <div className="p-3 border-b border-slate-100 bg-slate-50/70 flex-shrink-0">
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
             <input
@@ -289,11 +251,8 @@ export const MessagesPage: React.FC = () => {
 
         {/* Conversation List Stream */}
         <div className="flex-1 overflow-y-auto p-3 space-y-4 chat-scrollbar">
-          {/* =================================================================
-              1. TEAM CHAT (Universal Workspace Channel)
-              ================================================================= */}
-          {(sidebarFilter === 'all' || sidebarFilter === 'team') && (
-            <div>
+          {/* 1. TEAM CHAT (Universal Workspace Channel) */}
+          <div>
               <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Hash className="w-3 h-3 text-emerald-700" />
@@ -342,13 +301,9 @@ export const MessagesPage: React.FC = () => {
                 </div>
               </button>
             </div>
-          )}
 
-          {/* =================================================================
-              2. PERSONAL CHAT (1-on-1 End-to-End Encrypted Direct Messages)
-              ================================================================= */}
-          {(sidebarFilter === 'all' || sidebarFilter === 'personal') && (
-            <div>
+          {/* 2. PERSONAL CHAT (1-on-1 Direct Messages) */}
+          <div>
               <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Lock className="w-3 h-3 text-emerald-700" />
@@ -447,7 +402,6 @@ export const MessagesPage: React.FC = () => {
                 )}
               </div>
             </div>
-          )}
         </div>
       </div>
 
