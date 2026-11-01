@@ -290,44 +290,88 @@ export const LoginPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-2 text-xs text-slate-600">
-              <p className="font-semibold text-slate-700">Manager Account:</p>
-              <div className="p-2 bg-emerald-50/70 rounded-lg border border-emerald-200 flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-slate-900 text-xs">shreyasjadhav@gmail.com</div>
-                  <div className="text-[10px] text-emerald-700 font-mono">pwd: shreyas123</div>
+            <div className="space-y-3 text-xs text-slate-600 max-h-80 overflow-y-auto pr-1">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  Software Development Team
+                </span>
+                <div className="space-y-1.5 mt-1.5">
+                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">Shreyas (Manager)</div>
+                      <div className="text-[10px] text-slate-500 font-mono">shreyas123</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsernameOrEmail('shreyasjadhav@gmail.com');
+                        setPassword('shreyas123');
+                        setShowForgotModal(false);
+                      }}
+                      className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">Sahil (Dev Lead)</div>
+                      <div className="text-[10px] text-slate-500 font-mono">password123</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsernameOrEmail('sahilparbale@gmail.com');
+                        setPassword('password123');
+                        setShowForgotModal(false);
+                      }}
+                      className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsernameOrEmail('shreyasjadhav@gmail.com');
-                    setPassword('shreyas123');
-                    setShowForgotModal(false);
-                  }}
-                  className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
-                >
-                  Apply
-                </button>
               </div>
 
-              <div className="pt-1">
-                <p className="font-semibold text-slate-700 mb-1 text-[11px]">Employee Account:</p>
-                <div className="p-2 bg-emerald-50/70 rounded-lg border border-emerald-200 flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-slate-900 text-xs">sahilparbale@gmail.com</div>
-                    <div className="text-[10px] text-emerald-700 font-mono">user: sahil • pwd: password123</div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                  Marketing Team
+                </span>
+                <div className="space-y-1.5 mt-1.5">
+                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">Priya (Marketing Mgr)</div>
+                      <div className="text-[10px] text-slate-500 font-mono">marketing123</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsernameOrEmail('priya.marketing@taskflow.io');
+                        setPassword('marketing123');
+                        setShowForgotModal(false);
+                      }}
+                      className="px-2 py-0.5 rounded bg-teal-700 hover:bg-teal-800 text-white font-semibold text-[11px] cursor-pointer"
+                    >
+                      Apply
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUsernameOrEmail('sahilparbale@gmail.com');
-                      setPassword('password123');
-                      setShowForgotModal(false);
-                    }}
-                    className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
-                  >
-                    Apply
-                  </button>
+                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">Aarav (Growth Spec)</div>
+                      <div className="text-[10px] text-slate-500 font-mono">marketing123</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsernameOrEmail('aarav.mehta@taskflow.io');
+                        setPassword('marketing123');
+                        setShowForgotModal(false);
+                      }}
+                      className="px-2 py-0.5 rounded bg-teal-700 hover:bg-teal-800 text-white font-semibold text-[11px] cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

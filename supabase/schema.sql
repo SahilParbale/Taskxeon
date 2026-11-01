@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
   deadline TEXT,
   members JSONB NOT NULL DEFAULT '[]'::jsonb,
   progress INTEGER NOT NULL DEFAULT 0,
+  department TEXT DEFAULT 'Engineering',
   last_updated_by TEXT,
   last_updated_at TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   due_date TEXT NOT NULL,
   tags JSONB DEFAULT '[]'::jsonb,
   estimated_hours NUMERIC,
+  department TEXT DEFAULT 'Engineering',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
@@ -128,13 +130,23 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 
 -- ============================================================================
--- Seed Initial Users (Shreyas Jadhav & Sahil Parbale)
+-- Migration Helpers for Existing Deployments: Add department column
+-- ============================================================================
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering';
+
+-- ============================================================================
+-- Seed Initial Users (Software Development & Marketing Personas)
 -- ============================================================================
 INSERT INTO public.users (id, name, email, role, avatar, title, department, presence, bio, phone)
 VALUES
-  ('user-1', 'Shreyas Jadhav', 'shreyasjadhav@gmail.com', 'manager', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', 'Head of Product & Operations', 'Product Leadership', 'online', 'Oversees product strategy, sprint allocation, and team deliverables.', '+1 (555) 234-5678'),
-  ('user-2', 'Sahil Parbale', 'sahilparbale@gmail.com', 'employee', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Lead Full-Stack Engineer', 'Engineering', 'online', 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.', '+1 (555) 345-6789')
+  ('user-1', 'Shreyas Jadhav', 'shreyasjadhav@gmail.com', 'manager', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', 'Head of Software Development', 'Engineering', 'online', 'Oversees software engineering, sprint allocation, and technical deliverables.', '+1 (555) 234-5678'),
+  ('user-2', 'Sahil Parbale', 'sahilparbale@gmail.com', 'employee', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Lead Full-Stack Engineer', 'Engineering', 'online', 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.', '+1 (555) 345-6789'),
+  ('user-marketing-mgr', 'Priya Sharma', 'priya.marketing@taskflow.io', 'manager', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80', 'Head of Marketing & Growth', 'Marketing', 'online', 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.', '+1 (555) 456-7890'),
+  ('user-marketing-emp', 'Aarav Mehta', 'aarav.mehta@taskflow.io', 'employee', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Growth & Content Specialist', 'Marketing', 'online', 'Executes organic social media, content production, paid search campaigns, and conversion copy.', '+1 (555) 567-8901')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   email = EXCLUDED.email,
-  role = EXCLUDED.role;
+  role = EXCLUDED.role,
+  title = EXCLUDED.title,
+  department = EXCLUDED.department;

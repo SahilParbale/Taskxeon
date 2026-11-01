@@ -120,6 +120,7 @@ export async function fetchProjectsFromSupabase(): Promise<Project[] | null> {
       deadline: row.deadline || '',
       members: Array.isArray(row.members) ? row.members : (typeof row.members === 'string' ? JSON.parse(row.members) : []),
       progress: Number(row.progress) || 0,
+      department: row.department || 'Engineering',
       lastUpdatedBy: row.last_updated_by,
       lastUpdatedAt: row.last_updated_at
     }));
@@ -131,7 +132,7 @@ export async function fetchProjectsFromSupabase(): Promise<Project[] | null> {
 
 export async function upsertProjectToSupabase(project: Project): Promise<boolean> {
   try {
-    const payload = {
+    const payload: any = {
       id: project.id,
       name: project.name,
       key: project.key,
@@ -140,15 +141,27 @@ export async function upsertProjectToSupabase(project: Project): Promise<boolean
       deadline: project.deadline,
       members: project.members,
       progress: project.progress,
+      department: project.department || 'Engineering',
       last_updated_by: project.lastUpdatedBy,
       last_updated_at: project.lastUpdatedAt
     };
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
+    let res = await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
       method: 'POST',
       headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
       body: JSON.stringify(payload)
     });
+
+    if (!res.ok && res.status === 400) {
+      // Graceful fallback if department column is not yet migrated in Supabase
+      const { department, ...fallbackPayload } = payload;
+      res = await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
+        method: 'POST',
+        headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+        body: JSON.stringify(fallbackPayload)
+      });
+    }
+
     return res.ok;
   } catch (e) {
     console.warn('[Supabase] upsertProject error:', e);
@@ -192,7 +205,8 @@ export async function fetchTasksFromSupabase(): Promise<Task[] | null> {
       tags: Array.isArray(row.tags) ? row.tags : (typeof row.tags === 'string' ? JSON.parse(row.tags) : []),
       createdAt: row.created_at,
       completedAt: row.completed_at || undefined,
-      estimatedHours: row.estimated_hours ? Number(row.estimated_hours) : undefined
+      estimatedHours: row.estimated_hours ? Number(row.estimated_hours) : undefined,
+      department: row.department || 'Engineering'
     }));
   } catch (e) {
     console.warn('[Supabase] fetchTasks error:', e);
@@ -202,7 +216,7 @@ export async function fetchTasksFromSupabase(): Promise<Task[] | null> {
 
 export async function upsertTaskToSupabase(task: Task): Promise<boolean> {
   try {
-    const payload = {
+    const payload: any = {
       id: task.id,
       title: task.title,
       description: task.description,
@@ -214,14 +228,26 @@ export async function upsertTaskToSupabase(task: Task): Promise<boolean> {
       due_date: task.dueDate,
       tags: task.tags || [],
       estimated_hours: task.estimatedHours || null,
-      completed_at: task.completedAt || null
+      completed_at: task.completedAt || null,
+      department: task.department || 'Engineering'
     };
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
+    let res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
       method: 'POST',
       headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
       body: JSON.stringify(payload)
     });
+
+    if (!res.ok && res.status === 400) {
+      // Graceful fallback if department column is not yet migrated in Supabase
+      const { department, ...fallbackPayload } = payload;
+      res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
+        method: 'POST',
+        headers: getHeaders({ 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+        body: JSON.stringify(fallbackPayload)
+      });
+    }
+
     return res.ok;
   } catch (e) {
     console.warn('[Supabase] upsertTask error:', e);
@@ -353,7 +379,7 @@ export async function purgeLegacySeedUsersFromSupabase(): Promise<void> {
   }
 }
 
-// Ensure Sahil and Shreyas are always in the Supabase database
+// Ensure default users for both Software and Marketing teams exist in Supabase
 export async function ensureDefaultUsersInSupabase(): Promise<void> {
   const defaultUsers: User[] = [
     {
@@ -363,11 +389,11 @@ export async function ensureDefaultUsersInSupabase(): Promise<void> {
       username: 'shreyasjadhav',
       password: 'shreyas123',
       role: 'manager',
-      title: 'Head of Product & Operations',
-      department: 'Product Leadership',
+      title: 'Head of Software Development',
+      department: 'Engineering',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
       presence: 'online',
-      bio: 'Oversees product strategy, sprint allocation, and team deliverables.'
+      bio: 'Oversees software engineering, sprint allocation, and technical deliverables.'
     },
     {
       id: 'user-2',
@@ -381,6 +407,32 @@ export async function ensureDefaultUsersInSupabase(): Promise<void> {
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       presence: 'online',
       bio: 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.'
+    },
+    {
+      id: 'user-marketing-mgr',
+      name: 'Priya Sharma',
+      email: 'priya.marketing@taskflow.io',
+      username: 'priyasharma',
+      password: 'marketing123',
+      role: 'manager',
+      title: 'Head of Marketing & Growth',
+      department: 'Marketing',
+      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+      presence: 'online',
+      bio: 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.'
+    },
+    {
+      id: 'user-marketing-emp',
+      name: 'Aarav Mehta',
+      email: 'aarav.mehta@taskflow.io',
+      username: 'aarav',
+      password: 'marketing123',
+      role: 'employee',
+      title: 'Growth & Content Specialist',
+      department: 'Marketing',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      presence: 'online',
+      bio: 'Executes organic social media, content production, paid search campaigns, and conversion copy.'
     }
   ];
 
@@ -567,9 +619,12 @@ export async function insertMessageToSupabase(msg: ChatMessage): Promise<boolean
 // ==========================================
 // Clear all data from Supabase Cloud
 // ==========================================
-export async function clearMessagesFromSupabase(): Promise<boolean> {
+export async function clearMessagesFromSupabase(channelId?: string): Promise<boolean> {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?id=neq.placeholder_none`, {
+    const filter = channelId
+      ? `channel_id=eq.${encodeURIComponent(channelId)}`
+      : 'id=neq.placeholder_none';
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?${filter}`, {
       method: 'DELETE',
       headers: getHeaders()
     });

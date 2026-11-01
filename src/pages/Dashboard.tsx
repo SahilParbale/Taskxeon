@@ -75,7 +75,7 @@ export const Dashboard: React.FC = () => {
               Overview
             </h1>
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-semibold text-xs border border-emerald-200">
-              Active Workspace
+              {currentUser.department && currentUser.department.toLowerCase().includes('market') ? 'Marketing Workspace' : 'Software Workspace'}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
@@ -89,7 +89,7 @@ export const Dashboard: React.FC = () => {
             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs shadow-sm transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 text-emerald-700" />
-            <span>New Project</span>
+            <span>{currentUser.department && currentUser.department.toLowerCase().includes('market') ? 'New Campaign' : 'New Project'}</span>
           </button>
           <button
             onClick={() => setIsCreateModalOpen(true)}

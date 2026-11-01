@@ -69,7 +69,9 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
     },
     {
       id: 'projects',
-      label: currentUser.role === 'employee' ? 'My Projects' : 'Projects',
+      label: currentUser.department && currentUser.department.toLowerCase().includes('market')
+        ? (currentUser.role === 'employee' ? 'My Campaigns' : 'Campaigns')
+        : (currentUser.role === 'employee' ? 'My Projects' : 'Projects'),
       icon: <FolderKanban className="w-4 h-4" />,
       badge: (currentUser.role === 'employee'
         ? projects.filter(p => p.members.includes(currentUser.id)).length
@@ -108,10 +110,14 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
                 TaskFlow
               </span>
               <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold text-[9px] uppercase tracking-wider">
-                Enterprise
+                {currentUser.department && currentUser.department.toLowerCase().includes('market') ? 'Marketing' : 'Software'}
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 font-medium">Corporate Task Orchestration</p>
+            <p className="text-[10px] text-slate-400 font-medium">
+              {currentUser.department && currentUser.department.toLowerCase().includes('market')
+                ? 'Marketing & Growth'
+                : 'Software Engineering'}
+            </p>
           </div>
         </div>
 

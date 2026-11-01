@@ -37,10 +37,10 @@ export const CreateTaskModal: React.FC = () => {
         setProjectId(projects[0].id);
       }
 
-      // Default assignee strictly to an employee contributor (managers only assign tasks, never to themselves)
+      // Default assignee strictly to an employee contributor in current department
       const employeeContributors = users.filter(u => u.role === 'employee');
       if (!assigneeId || !employeeContributors.some(e => e.id === assigneeId)) {
-        const defaultEmp = employeeContributors.find(u => u.name.includes('Alex')) || employeeContributors[0];
+        const defaultEmp = employeeContributors[0];
         if (defaultEmp) {
           setAssigneeId(defaultEmp.id);
         }
@@ -262,7 +262,7 @@ export const CreateTaskModal: React.FC = () => {
                 type="text"
                 value={tagsInput}
                 onChange={e => setTagsInput(e.target.value)}
-                placeholder="e.g. Design System, High Priority, SOC2"
+                placeholder={currentUser.department && currentUser.department.toLowerCase().includes('market') ? 'e.g. Campaign, SEO, Content, Social Media' : 'e.g. API, Frontend, Bug Fix, DevOps'}
                 className="w-full px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-sm transition-all"
               />
             </div>

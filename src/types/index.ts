@@ -39,6 +39,7 @@ export interface Task {
   completedAt?: string;
   tags?: string[];
   estimatedHours?: number;
+  department?: string;
 }
 
 export interface Project {
@@ -52,6 +53,7 @@ export interface Project {
   progress: number; // 0 - 100, manually updated by employees and managers
   lastUpdatedBy?: string;
   lastUpdatedAt?: string;
+  department?: string;
 }
 
 export interface Notification {

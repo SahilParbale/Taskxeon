@@ -87,8 +87,10 @@ export const MessagesPage: React.FC = () => {
     if (activeRecipient) {
       return `dm-${[currentUser.id, activeRecipient.id].sort().join('-')}`;
     }
-    return 'ch-team-chat';
-  }, [activeRecipient, currentUser.id]);
+    return currentUser.department && currentUser.department.toLowerCase().includes('market')
+      ? 'ch-marketing'
+      : 'ch-engineering';
+  }, [activeRecipient, currentUser.id, currentUser.department]);
 
   // Compute live safety fingerprint for current chat
   useEffect(() => {
@@ -153,8 +155,16 @@ export const MessagesPage: React.FC = () => {
   // - 'team': strictly universal #team-chat messages (no recipientId, and channelId === 'ch-team-chat')
   // - Direct Message: strictly messages between currentUser and activeRecipient
   const conversationMessages = useMemo(() => {
+    const isMarketing = currentUser.department && currentUser.department.toLowerCase().includes('market');
     if (activeChatTarget === 'team') {
-      return messages.filter(m => !m.recipientId && (!m.channelId || m.channelId === 'ch-team-chat'));
+      return messages.filter(m => {
+        if (m.recipientId) return false;
+        if (isMarketing) {
+          return m.channelId === 'ch-marketing';
+        } else {
+          return m.channelId === 'ch-engineering' || m.channelId === 'ch-team-chat' || !m.channelId;
+        }
+      });
     }
     if (!activeRecipient) return [];
     return messages.filter(m => {
@@ -185,8 +195,9 @@ export const MessagesPage: React.FC = () => {
       // 1-on-1 Direct Message addressed specifically to active recipient's ID
       sendMessage(inputText.trim(), undefined, activeRecipient.id);
     } else {
-      // Universal Team Chat Channel
-      sendMessage(inputText.trim(), 'ch-team-chat');
+      // Department Team Chat Channel
+      const isMarketing = currentUser.department && currentUser.department.toLowerCase().includes('market');
+      sendMessage(inputText.trim(), isMarketing ? 'ch-marketing' : 'ch-engineering');
     }
 
     setInputText('');
@@ -287,7 +298,9 @@ export const MessagesPage: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-xs truncate font-bold flex items-center gap-1.5">
-                        Team Chat
+                        {currentUser.department && currentUser.department.toLowerCase().includes('market')
+                          ? 'Marketing Team'
+                          : 'Software Dev Team'}
                         <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
                           All
                         </span>
@@ -295,7 +308,9 @@ export const MessagesPage: React.FC = () => {
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
                     </div>
                     <p className="text-[10px] text-slate-400 truncate font-normal mt-0.5">
-                      Universal E2EE • All {users.length} members
+                      {currentUser.department && currentUser.department.toLowerCase().includes('market')
+                        ? `Marketing & Growth • ${users.length} members`
+                        : `Engineering & Tech • ${users.length} members`}
                     </p>
                   </div>
                 </div>
@@ -437,14 +452,21 @@ export const MessagesPage: React.FC = () => {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h2 className="text-base font-bold text-slate-900 tracking-tight truncate">
-                      Team Chat
+                      {currentUser.department && currentUser.department.toLowerCase().includes('market')
+                        ? 'Marketing Team Chat'
+                        : 'Software Development Team Chat'}
                     </h2>
                   </div>
                   <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
                     <span className="font-semibold text-emerald-800">{onlineCount} Online</span>
                     <span>•</span>
-                    <span>{users.length} Workspace Members</span>
+                    <span>
+                      {users.length}{' '}
+                      {currentUser.department && currentUser.department.toLowerCase().includes('market')
+                        ? 'Marketing Members'
+                        : 'Software Members'}
+                    </span>
                   </p>
                 </div>
               </div>

@@ -71,6 +71,7 @@ interface AppContextType {
   devLogs: DevLog[];
   messages: ChatMessage[];
   currentView: ViewType;
+  department: 'engineering' | 'marketing';
   selectedProjectId: string | null;
   selectedTaskId: string | null;
   searchQuery: string;
@@ -254,14 +255,75 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
+  // Normalize department key to either 'engineering' or 'marketing'
+  const normalizeDepartment = (dept?: string): 'engineering' | 'marketing' => {
+    if (!dept) return 'engineering';
+    const d = dept.toLowerCase();
+    if (d.includes('market') || d.includes('growth')) return 'marketing';
+    return 'engineering';
+  };
+
   // Current active user object with resilient ID resolution across aliases
   const currentUser = useMemo(() => {
     return (
       users.find(u => u.id === currentUserId) ||
+      (currentUserId === 'user-marketing-mgr' ? users.find(u => u.email.includes('priya') || u.name.includes('Priya')) : undefined) ||
+      (currentUserId === 'user-marketing-emp' ? users.find(u => u.email.includes('aarav') || u.name.includes('Aarav')) : undefined) ||
       (currentUserId === 'user-2' ? users.find(u => u.name.includes('Sahil') || u.email.includes('sahil')) : undefined) ||
       users[0]
     );
   }, [users, currentUserId]);
+
+  // Current department based on authenticated user
+  const currentDept = useMemo(() => {
+    return normalizeDepartment(currentUser.department);
+  }, [currentUser.department]);
+
+  // Strict Department-Scoped Data Partitioning (Zero cross-department leaking)
+  const scopedUsers = useMemo(() => {
+    return users.filter(u => normalizeDepartment(u.department) === currentDept);
+  }, [users, currentDept]);
+
+  const scopedProjects = useMemo(() => {
+    return projects.filter(p => {
+      if (p.department) return normalizeDepartment(p.department) === currentDept;
+      const firstMember = users.find(u => p.members?.includes(u.id));
+      return firstMember ? normalizeDepartment(firstMember.department) === currentDept : currentDept === 'engineering';
+    });
+  }, [projects, users, currentDept]);
+
+  const scopedTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (t.department) return normalizeDepartment(t.department) === currentDept;
+      const assignee = users.find(u => u.id === t.assigneeId || u.id === t.createdById);
+      return assignee ? normalizeDepartment(assignee.department) === currentDept : currentDept === 'engineering';
+    });
+  }, [tasks, users, currentDept]);
+
+  const scopedActivities = useMemo(() => {
+    return activities.filter(a => {
+      const actUser = users.find(u => u.id === a.userId);
+      return actUser ? normalizeDepartment(actUser.department) === currentDept : currentDept === 'engineering';
+    });
+  }, [activities, users, currentDept]);
+
+  const scopedMessages = useMemo(() => {
+    const scopedUserIds = new Set(scopedUsers.map(u => u.id));
+    return messages.filter(m => {
+      if (!m.recipientId) {
+        if (currentDept === 'marketing') {
+          return m.channelId === 'ch-marketing';
+        } else {
+          return m.channelId === 'ch-engineering' || m.channelId === 'ch-team-chat' || !m.channelId;
+        }
+      }
+      return (
+        (m.senderId === currentUser.id && scopedUserIds.has(m.recipientId)) ||
+        (m.recipientId === currentUser.id && scopedUserIds.has(m.senderId)) ||
+        (scopedUserIds.has(m.senderId) && scopedUserIds.has(m.recipientId))
+      );
+    });
+  }, [messages, currentDept, scopedUsers, currentUser.id]);
 
   // Stable references for realtime subscription and background polling to eliminate stale closures
   const currentUserIdRef = useRef(currentUserId);
@@ -658,6 +720,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       deadline: data.deadline,
       members: data.members.length > 0 ? data.members : [currentUser.id],
       progress: data.initialProgress !== undefined ? data.initialProgress : 0,
+      department: currentUser.department || (currentDept === 'marketing' ? 'Marketing' : 'Engineering'),
       lastUpdatedBy: currentUser.name,
       lastUpdatedAt: 'Just now'
     };
@@ -753,7 +816,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const fallbackUsername = data.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
     const username = data.username?.trim().toLowerCase() || fallbackUsername;
     const password = data.password?.trim() || 'password123';
-    const dept = data.department?.trim() || 'Engineering';
+    const dept = data.department?.trim() || (currentDept === 'marketing' ? 'Marketing' : 'Engineering');
 
     const newUser: User = {
       id: newUserId,
@@ -789,7 +852,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setActivities(prev => [newAct, ...prev]);
     insertActivityToSupabase(newAct);
 
-    // Auto-add new employee to the unified team chat with an announcement
+    // Auto-add new employee to their department's team chat with an announcement
+    const targetChannel = currentDept === 'marketing' ? 'ch-marketing' : 'ch-engineering';
     const welcomeMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       senderId: currentUser.id,
@@ -797,7 +861,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       senderAvatar: currentUser.avatar,
       senderRole: currentUser.role,
       senderTitle: currentUser.title,
-      channelId: 'ch-team-chat',
+      channelId: targetChannel,
       text: `Welcome ${newUser.name} to the team as ${newUser.title}!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
@@ -816,7 +880,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
-    if (targetUser.role === 'manager' || targetUser.id === 'user-1' || targetUser.email === 'shreyasjadhav@gmail.com') {
+    if (
+      targetUser.role === 'manager' ||
+      targetUser.id === 'user-1' ||
+      targetUser.id === 'user-marketing-mgr' ||
+      targetUser.email === 'shreyasjadhav@gmail.com' ||
+      targetUser.email === 'priya.marketing@taskflow.io'
+    ) {
       addToast('Cannot Remove Manager', 'Manager accounts cannot be deleted.', 'warning');
       return;
     }
@@ -852,13 +922,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Switch demo persona by role
+  // Switch demo persona by role (within current department)
   const switchRole = (role: Role) => {
-    let targetUser = users.find(u => u.role === role);
+    let targetUser = scopedUsers.find(u => u.role === role);
     if (!targetUser) {
-      // Fallback match by id
-      if (role === 'manager') targetUser = users.find(u => u.id === 'user-1');
-      if (role === 'employee') targetUser = users.find(u => u.id === 'user-2');
+      targetUser = users.find(u => u.role === role && normalizeDepartment(u.department) === currentDept);
     }
     if (targetUser) {
       setCurrentUserId(targetUser.id);
@@ -941,7 +1009,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: 'todo',
       dueDate: data.dueDate,
       createdAt: new Date().toISOString(),
-      tags: data.tags || []
+      tags: data.tags || [],
+      department: currentUser.department || (currentDept === 'marketing' ? 'Marketing' : 'Engineering')
     };
 
     setTasks(prev => [newTask, ...prev]);
@@ -1196,15 +1265,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  // Send message (Universal #team-chat or 1-on-1 Direct Messaging)
+  // Send message (Partitioned team chat or 1-on-1 Direct Messaging)
   const sendMessage = (text: string, channelId?: string, recipientId?: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // Direct message channel key or universal team channel
+    const defaultChannel = currentDept === 'marketing' ? 'ch-marketing' : 'ch-engineering';
+
+    // Direct message channel key or department team channel
     const targetChannel = recipientId
       ? `dm-${[currentUser.id, recipientId].sort().join('-')}`
-      : (channelId || 'ch-team-chat');
+      : (channelId || defaultChannel);
 
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1250,12 +1321,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Clear all team chat messages directly from Supabase Cloud
+  // Clear team chat messages for current channel directly from Supabase Cloud
   const clearMessages = () => {
-    setMessages([]);
-    clearMessagesFromSupabase();
-    realtimeSync.broadcast('MESSAGES_CLEARED', {});
-    addToast('Chat Cleared', 'All messages have been cleared from Team Chat and Supabase database.', 'info');
+    const channelToClear = currentDept === 'marketing' ? 'ch-marketing' : 'ch-engineering';
+    setMessages(prev => prev.filter(m => {
+      if (m.recipientId) return true;
+      if (currentDept === 'marketing') return m.channelId !== 'ch-marketing';
+      return m.channelId !== 'ch-engineering' && m.channelId !== 'ch-team-chat' && !!m.channelId;
+    }));
+    clearMessagesFromSupabase(channelToClear);
+    realtimeSync.broadcast('MESSAGES_CLEARED', { channelId: channelToClear });
+    addToast('Chat Cleared', `Messages in ${currentDept === 'marketing' ? 'Marketing' : 'Software Development'} channel have been cleared.`, 'info');
   };
 
   // Reset data to pristine production state
@@ -1311,32 +1387,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         nameLower === rawInput ||
         emailPrefix === rawInput ||
         ((rawInput === 'shreyasjadhav@gmail.com' || rawInput === 'shreyasjadhav' || rawInput === 'shreyas') && u.id === 'user-1') ||
-        ((rawInput === 'sahilparbale@gmail.com' || rawInput === 'sahil' || rawInput === 'sahilparbale') && (u.id === 'user-2' || u.name.includes('Sahil')))
+        ((rawInput === 'sahilparbale@gmail.com' || rawInput === 'sahil' || rawInput === 'sahilparbale') && (u.id === 'user-2' || u.name.includes('Sahil'))) ||
+        ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || u.name.includes('Priya'))) ||
+        ((rawInput === 'aarav.mehta@taskflow.io' || rawInput === 'aarav') && (u.id === 'user-marketing-emp' || u.name.includes('Aarav')))
       );
     });
 
     if (!matchedUser) {
       return {
         success: false,
-        error: `No account found for "${usernameOrEmail}". Try using Shreyas Jadhav (shreyasjadhav@gmail.com) or Sahil Parbale (sahilparbale@gmail.com / sahil).`
+        error: `No account found for "${usernameOrEmail}". Try Shreyas Jadhav (shreyasjadhav@gmail.com) for Software or Priya Sharma (priya.marketing@taskflow.io) for Marketing.`
       };
     }
 
     // Check password
-    const expectedPassword = matchedUser.password || (matchedUser.id === 'user-1' ? 'shreyas123' : 'password123');
+    const expectedPassword = matchedUser.password || (
+      matchedUser.id === 'user-1' ? 'shreyas123' :
+      matchedUser.id === 'user-marketing-mgr' || matchedUser.id === 'user-marketing-emp' ? 'marketing123' :
+      'password123'
+    );
     const isPasswordValid =
       password === expectedPassword ||
       (matchedUser.id === 'user-1' && (password === 'shreyas123' || password === 'password123')) ||
       (matchedUser.id === 'user-2' && (password === 'sahil123' || password === 'password123')) ||
+      (matchedUser.department.toLowerCase().includes('market') && (password === 'marketing123' || password === 'password123')) ||
       password === 'password123' ||
       password === 'taskflow123';
 
     if (!isPasswordValid) {
+      const defaultPwdHint = matchedUser.id === 'user-1'
+        ? '"shreyas123"'
+        : matchedUser.department.toLowerCase().includes('market')
+        ? '"marketing123"'
+        : '"password123"';
       return {
         success: false,
-        error: matchedUser.id === 'user-1'
-          ? 'Incorrect password. Password for Shreyas Jadhav is "shreyas123".'
-          : 'Incorrect password. Password for Sahil Parbale is "password123" or "sahil123".'
+        error: `Incorrect password. Password for ${matchedUser.name} is ${defaultPwdHint}.`
       };
     }
 
@@ -1404,15 +1490,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider
       value={{
         currentUser,
-        users,
-        tasks,
-        projects,
+        users: scopedUsers,
+        tasks: scopedTasks,
+        projects: scopedProjects,
         notifications,
-        activities,
+        activities: scopedActivities,
         devPipelines,
         devLogs,
-        messages,
+        messages: scopedMessages,
         currentView,
+        department: currentDept,
         selectedProjectId,
         selectedTaskId,
         searchQuery,
