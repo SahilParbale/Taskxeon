@@ -43,6 +43,24 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  // Instant 1-click demo login handler for rapid testing
+  const handleQuickLogin = async (username: string, pass: string) => {
+    setUsernameOrEmail(username);
+    setPassword(pass);
+    setErrorMessage(null);
+    setIsLoading(true);
+    try {
+      const res = await login(username, pass);
+      if (!res.success) {
+        setErrorMessage(res.error || 'Authentication error');
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Authentication error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
 
   return (
@@ -255,7 +273,7 @@ export const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isLoading ? (
                   <span className="flex items-center gap-1.5">
@@ -267,6 +285,70 @@ export const LoginPage: React.FC = () => {
                 )}
               </button>
             </form>
+
+            {/* 1-Click Demo Login for Testing */}
+            <div className="mt-4 pt-3.5 border-t border-slate-100 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  1-Click Testing Login
+                </span>
+                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  Instant Access
+                </span>
+              </div>
+
+              {/* Software Development Team Personas */}
+              <div className="space-y-1">
+                <div className="text-[10px] font-bold text-slate-600">Software Development:</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => handleQuickLogin('shreyasjadhav@gmail.com', 'shreyas123')}
+                    className="p-2 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
+                  >
+                    <span className="font-bold text-xs text-slate-900">Shreyas Jadhav</span>
+                    <span className="text-[10px] text-emerald-800 font-semibold">Software Manager</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => handleQuickLogin('sahilparbale@gmail.com', 'password123')}
+                    className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
+                  >
+                    <span className="font-bold text-xs text-slate-900">Sahil Parbale</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Dev Engineer</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Marketing Team Personas */}
+              <div className="space-y-1 pt-0.5">
+                <div className="text-[10px] font-bold text-slate-600">Marketing Team:</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => handleQuickLogin('priya.marketing@taskflow.io', 'marketing123')}
+                    className="p-2 rounded-lg border border-teal-200 bg-teal-50/70 hover:bg-teal-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
+                  >
+                    <span className="font-bold text-xs text-slate-900">Priya Sharma</span>
+                    <span className="text-[10px] text-teal-800 font-semibold">Marketing Manager</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => handleQuickLogin('aarav.mehta@taskflow.io', 'marketing123')}
+                    className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
+                  >
+                    <span className="font-bold text-xs text-slate-900">Aarav Mehta</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Growth Specialist</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
         </div>
