@@ -1,9 +1,9 @@
 import { Project, Task, User, ActivityLog, Notification, ChatMessage, PresenceStatus } from '../types';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://kgkggknznzumdhujsilj.supabase.co';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://xdwkcybxgqdtnpnypxfj.supabase.co';
 const SUPABASE_ANON_KEY =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2dna256bnp1bWRodWpzaWxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2NDY4NDYsImV4cCI6MjEwODIyMjg0Nn0.52A9fLDD0OnozJLivQbA1_sShNsG5rvMcEQfclvAK6I';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhkd2tjeWJ4Z3FkdG5wbnlweGZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0OTY3NDksImV4cCI6MjEwOTA3Mjc0OX0.e596Uej5lQi3QmRmwZIu7bV-Cw165Awo0vQSwqAjA2g';
 
 export type SupabaseStatus = 'connected' | 'connecting' | 'needs_migration' | 'disconnected';
 

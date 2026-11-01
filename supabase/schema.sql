@@ -1,6 +1,6 @@
 -- ============================================================================
 -- TaskFlow Enterprise Supabase Database Schema
--- Project: kgkggknznzumdhujsilj
+-- Project: xdwkcybxgqdtnpnypxfj
 -- ============================================================================
 
 -- 1. Users / Employees Table
@@ -128,37 +128,13 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 
 -- ============================================================================
--- Seed Initial Demo Data (Only inserts if not already present)
+-- Seed Initial Users (Shreyas Jadhav & Sahil Parbale)
 -- ============================================================================
-
--- Insert Users
 INSERT INTO public.users (id, name, email, role, avatar, title, department, presence, bio, phone)
 VALUES
-  ('user-1', 'Shreyas Jadhav', 'shreyasjadhav@gmail.com', 'manager', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', 'Engineering Director', 'Engineering', 'online', 'Leading engineering team operations and architectural scaling.', '+1 (555) 234-5678'),
-  ('user-2', 'Alex Morgan', 'alex.morgan@company.com', 'employee', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Senior Full Stack Engineer', 'Core Product', 'online', 'TypeScript, React, Node.js systems architect.', '+1 (555) 345-6789'),
-  ('user-3', 'David Chen', 'david.chen@company.com', 'employee', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', 'DevOps & Cloud Lead', 'Infrastructure', 'break', 'Kubernetes, multi-region AWS architectures and CI/CD pipelines.', '+1 (555) 456-7890'),
-  ('user-4', 'Elena Rostova', 'elena.rostova@company.com', 'employee', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Product Designer', 'Design & UX', 'online', 'Design systems, accessibility, and micro-interactions.', '+1 (555) 567-8901'),
-  ('user-5', 'Marcus Vance', 'marcus.vance@company.com', 'employee', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80', 'Security & QA Engineer', 'Security', 'offline', 'Automated testing suites and vulnerability assessments.', '+1 (555) 678-9012')
-ON CONFLICT (id) DO NOTHING;
-
--- Insert Projects
-INSERT INTO public.projects (id, name, key, description, health, deadline, members, progress, last_updated_by, last_updated_at)
-VALUES
-  ('proj-1', 'TaskFlow Web 2.0', 'TF', 'Complete frontend rebuild using React, TypeScript, and modern component architecture.', 'on_track', '2026-11-15', '["user-1", "user-2", "user-4"]'::jsonb, 72, 'Alex Morgan', 'Today at 10:15 AM'),
-  ('proj-2', 'Enterprise Security Audit', 'SEC', 'SOC2 Type II remediation, RBAC permission matrices, audit logging, and third-party penetration response.', 'at_risk', '2026-10-25', '["user-1", "user-2", "user-3", "user-5"]'::jsonb, 45, 'Shreyas Jadhav', 'Yesterday at 3:30 PM'),
-  ('proj-3', 'Cloud Infrastructure v2', 'INF', 'Multi-region AWS EKS rollout, Terraform IAC templates, and automated Redis cluster sharding for zero-downtime scaling.', 'on_track', '2026-12-05', '["user-1", "user-3"]'::jsonb, 88, 'David Chen', '2 days ago'),
-  ('proj-4', 'Customer Billing Migration', 'FIN', 'Transition enterprise tier invoicing from legacy system to unified Stripe Billing API with automated tax recalculation.', 'on_track', '2026-11-28', '["user-1", "user-4"]'::jsonb, 60, 'Elena Rostova', '3 days ago')
-ON CONFLICT (id) DO NOTHING;
-
--- Insert Initial Tasks
-INSERT INTO public.tasks (id, title, description, project_id, assignee_id, created_by_id, priority, status, due_date, tags)
-VALUES
-  ('task-101', 'Design high-fidelity design system tokens', 'Create standardized Tailwind semantic color variables, typography scales, and button interactive states for web and tablet.', 'proj-1', 'user-2', 'user-1', 'high', 'in_progress', '2026-10-24', '["Design System", "UI/UX"]'::jsonb),
-  ('task-102', 'Review Q3 Security Audit Spec and RBAC Matrix', 'Verify role-based access control restrictions for manager vs employee roles and produce a signed compliance signoff document.', 'proj-2', 'user-2', 'user-1', 'urgent', 'todo', '2026-10-22', '["Security", "Compliance"]'::jsonb),
-  ('task-103', 'Deploy multi-region AWS EKS cluster', 'Configure Terraform manifests for us-east-1 and eu-west-1 with automated latency failover routing via Route53.', 'proj-3', 'user-3', 'user-1', 'high', 'completed', '2026-10-20', '["DevOps", "Kubernetes"]'::jsonb),
-  ('task-104', 'Configure Redis cluster failover automated testing', 'Simulate leader pod termination in staging cluster and ensure node failover takes place under 400 milliseconds.', 'proj-3', 'user-3', 'user-1', 'urgent', 'blocked', '2026-10-23', '["Infrastructure", "Redis"]'::jsonb),
-  ('task-105', 'Update Stripe Billing webhooks and tax calculation', 'Implement resilient webhook handler for invoice.paid and customer.subscription.updated with idempotent event IDs.', 'proj-4', 'user-4', 'user-1', 'medium', 'in_progress', '2026-10-25', '["FinTech", "Stripe"]'::jsonb),
-  ('task-106', 'Implement user presence telemetry and heartbeat', 'Maintain employee live availability states (online, break, offline) with automatic timeout transitions after 15 min.', 'proj-1', 'user-2', 'user-1', 'high', 'in_progress', '2026-10-22', '["Architecture", "WebSockets"]'::jsonb),
-  ('task-107', 'Refactor navigation layout and responsive drawer', 'Consolidate sidebar navigation links, badge counters, and optimize mobile drawer touch swipe gestures.', 'proj-1', 'user-4', 'user-1', 'low', 'completed', '2026-10-19', '["Frontend", "Mobile"]'::jsonb),
-  ('task-108', 'Conduct automated penetration test suite', 'Run OWASP ZAP automated scanner against staging endpoints and prepare vulnerability triage matrix.', 'proj-2', 'user-5', 'user-1', 'urgent', 'todo', '2026-10-24', '["Security", "QA"]'::jsonb)
-ON CONFLICT (id) DO NOTHING;
+  ('user-1', 'Shreyas Jadhav', 'shreyasjadhav@gmail.com', 'manager', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', 'Head of Product & Operations', 'Product Leadership', 'online', 'Oversees product strategy, sprint allocation, and team deliverables.', '+1 (555) 234-5678'),
+  ('user-2', 'Sahil Parbale', 'sahilparbale@gmail.com', 'employee', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Lead Full-Stack Engineer', 'Engineering', 'online', 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.', '+1 (555) 345-6789')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  email = EXCLUDED.email,
+  role = EXCLUDED.role;
