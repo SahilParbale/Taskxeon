@@ -87,6 +87,7 @@ export interface ChatMessage {
   timestamp: string;
   channelId?: string;
   recipientId?: string;
+  isEncrypted?: boolean;
 }
 
 export interface DevPipeline {

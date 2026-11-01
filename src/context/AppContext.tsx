@@ -1216,7 +1216,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       text: trimmed,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       channelId: targetChannel,
-      recipientId: recipientId || undefined
+      recipientId: recipientId || undefined,
+      isEncrypted: true
     };
 
     // 1. Optimistic instant local state update

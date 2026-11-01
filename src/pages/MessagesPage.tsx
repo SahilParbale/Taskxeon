@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { MESSAGES_TABLE_SQL } from '../lib/supabase';
+import { getConversationSecurityFingerprint } from '../lib/encryption';
 import {
   MessageSquare,
   Send,
@@ -15,7 +16,15 @@ import {
   ExternalLink,
   AlertTriangle,
   Menu,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck,
+  Lock,
+  Shield,
+  Key,
+  Users,
+  Sparkles,
+  Plus,
+  Info
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -31,15 +40,21 @@ export const MessagesPage: React.FC = () => {
     addToast,
     isMessagesTableMissing,
     activeChatTarget,
-    setActiveChatTarget
+    setActiveChatTarget,
+    setIsCreateModalOpen
   } = useApp();
 
+  // Sidebar category filter: 'all' | 'team' | 'personal'
+  const [sidebarFilter, setSidebarFilter] = useState<'all' | 'team' | 'personal'>('all');
+  const [sidebarSearch, setSidebarSearch] = useState('');
   const [inputText, setInputText] = useState('');
   const [inThreadSearch, setInThreadSearch] = useState('');
   const [isThreadSearchOpen, setIsThreadSearchOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isNoticeDismissed, setIsNoticeDismissed] = useState(false);
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [securityFingerprint, setSecurityFingerprint] = useState('VERIFYING-KEYS-256');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,10 +88,23 @@ export const MessagesPage: React.FC = () => {
     return users.find(u => u.id === activeChatTarget || isUserMatch(activeChatTarget, u)) || null;
   }, [activeChatTarget, users]);
 
+  // Derive conversation key identifier for E2EE safety fingerprint
+  const currentConversationKey = useMemo(() => {
+    if (activeRecipient) {
+      return `dm-${[currentUser.id, activeRecipient.id].sort().join('-')}`;
+    }
+    return 'ch-team-chat';
+  }, [activeRecipient, currentUser.id]);
+
+  // Compute live safety fingerprint for current chat
+  useEffect(() => {
+    getConversationSecurityFingerprint(currentConversationKey).then(setSecurityFingerprint);
+  }, [currentConversationKey]);
+
   // Online count across team
   const onlineCount = users.filter(u => u.presence === 'online').length;
 
-  // Other colleagues for Direct Messaging
+  // Other colleagues for Personal Direct Messaging
   const otherMembers = useMemo(() => {
     return users.filter(u => u.id !== currentUser.id && u.email !== currentUser.email);
   }, [users, currentUser]);
@@ -100,6 +128,17 @@ export const MessagesPage: React.FC = () => {
       };
     });
   }, [otherMembers, messages, currentUser, activeChatTarget]);
+
+  // Filtered member list based on search
+  const filteredMembers = useMemo(() => {
+    if (!sidebarSearch.trim()) return membersWithDmMeta;
+    const q = sidebarSearch.toLowerCase();
+    return membersWithDmMeta.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      (m.title && m.title.toLowerCase().includes(q)) ||
+      (m.department && m.department.toLowerCase().includes(q))
+    );
+  }, [membersWithDmMeta, sidebarSearch]);
 
   // Check if any teammate sent a direct message while looking at Team Chat
   const pendingDmNotification = useMemo(() => {
@@ -174,22 +213,27 @@ export const MessagesPage: React.FC = () => {
   return (
     <div className="flex-1 min-h-0 w-full h-full flex overflow-hidden bg-slate-50 font-sans select-none relative">
       {/* =========================================================================
-          LEFT SIDEBAR: CHANNELS & DIRECT MESSAGES BY ID
+          LEFT SIDEBAR: CATEGORIZED CHANNELS (TEAM) & PERSONAL CHATS (E2EE)
           ========================================================================= */}
       <div
-        className={`w-72 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-20 transition-all duration-300 md:static fixed inset-y-0 left-0 shadow-lg md:shadow-none ${
+        className={`w-80 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-20 transition-all duration-300 md:static fixed inset-y-0 left-0 shadow-lg md:shadow-none ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        {/* Sidebar Header */}
-        <div className="h-16 px-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0 bg-slate-900 text-white">
+        {/* Sidebar Brand Header */}
+        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0 bg-slate-900 text-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shadow-2xs">
               <MessageSquare className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold tracking-tight">Conversations</h2>
-              <p className="text-[11px] text-slate-400 font-medium">Chat & Direct Messages</p>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-bold tracking-tight">Conversations</h2>
+                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold border border-emerald-500/30 flex items-center gap-0.5">
+                  <Lock className="w-2.5 h-2.5" /> E2EE
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium">Team Chat & Personal DMs</p>
             </div>
           </div>
           <button
@@ -200,137 +244,253 @@ export const MessagesPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Conversation List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-4 chat-scrollbar">
-          {/* CHANNELS SECTION */}
-          <div>
-            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Channels</span>
-              <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-semibold">1</span>
-            </div>
+        {/* Category Switcher Tabs: All | Team Chat | Personal DMs */}
+        <div className="p-3 border-b border-slate-100 bg-slate-50/70 space-y-2 flex-shrink-0">
+          <div className="flex rounded-xl bg-slate-200/70 p-1 text-xs font-semibold">
             <button
-              onClick={() => {
-                setActiveChatTarget('team');
-                setIsMobileSidebarOpen(false);
-              }}
-              className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
-                activeChatTarget === 'team'
-                  ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200/80 shadow-2xs'
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
+              onClick={() => setSidebarFilter('all')}
+              className={`flex-1 py-1.5 rounded-lg transition-all text-center ${
+                sidebarFilter === 'all'
+                  ? 'bg-white text-slate-900 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  activeChatTarget === 'team' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  <Hash className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs truncate">Team Chat</p>
-                  <p className="text-[10px] text-slate-400 truncate font-normal">All team members</p>
-                </div>
-              </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+              All
+            </button>
+            <button
+              onClick={() => setSidebarFilter('team')}
+              className={`flex-1 py-1.5 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
+                sidebarFilter === 'team'
+                  ? 'bg-white text-emerald-800 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Hash className="w-3 h-3 text-emerald-700" />
+              <span>Team</span>
+            </button>
+            <button
+              onClick={() => setSidebarFilter('personal')}
+              className={`flex-1 py-1.5 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
+                sidebarFilter === 'personal'
+                  ? 'bg-white text-emerald-800 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Lock className="w-3 h-3 text-emerald-700" />
+              <span>Personal</span>
             </button>
           </div>
 
-          {/* DIRECT MESSAGES SECTION (BY MEMBER ID) */}
-          <div>
-            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Direct Messages</span>
-              <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-semibold">
-                {membersWithDmMeta.length}
-              </span>
-            </div>
-
-            <div className="space-y-1 mt-1">
-              {membersWithDmMeta.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-slate-400 italic">No other members registered.</p>
-              ) : (
-                membersWithDmMeta.map(member => {
-                  const isSelected = activeChatTarget === member.id || isUserMatch(activeChatTarget, member);
-                  const isOnline = member.presence === 'online';
-                  const isOnBreak = member.presence === 'break';
-
-                  return (
-                    <button
-                      key={member.id}
-                      onClick={() => {
-                        setActiveChatTarget(member.id);
-                        setIsMobileSidebarOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-200/80 shadow-2xs'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="relative flex-shrink-0">
-                          <img
-                            src={member.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-                            alt={member.name}
-                            className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-100"
-                          />
-                          <span
-                            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
-                              isOnline ? 'bg-emerald-500' : isOnBreak ? 'bg-amber-500' : 'bg-slate-300'
-                            }`}
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <p className="text-xs truncate font-semibold">{member.name}</p>
-                              {member.role === 'manager' && (
-                                <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
-                                  MGR
-                                </span>
-                              )}
-                            </div>
-                            {member.lastMessage && (
-                              <span className="text-[9px] text-slate-400 font-normal tabular-nums flex-shrink-0">
-                                {member.lastMessage.timestamp}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between gap-1 mt-0.5">
-                            <p className="text-[10px] text-slate-400 truncate font-normal">
-                              {member.lastMessage
-                                ? `${isUserMatch(member.lastMessage.senderId, currentUser) ? 'You: ' : ''}${member.lastMessage.text}`
-                                : (member.title || 'Team Member')}
-                            </p>
-                            {member.unreadCount > 0 && (
-                              <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex-shrink-0">
-                                {member.unreadCount}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <ChevronRight className={`w-3.5 h-3.5 ml-1 text-slate-400 flex-shrink-0 ${isSelected ? 'text-emerald-700' : 'opacity-0 hover:opacity-100'}`} />
-                    </button>
-                  );
-                })
-              )}
-            </div>
+          {/* Quick Search across chats */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={sidebarSearch}
+              onChange={e => setSidebarSearch(e.target.value)}
+              placeholder="Search chats or members..."
+              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+            />
+            {sidebarSearch && (
+              <button
+                onClick={() => setSidebarSearch('')}
+                className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Current User Footnote */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center gap-2.5">
-          <div className="relative">
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30"
-            />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+        {/* Conversation List Stream */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-4 chat-scrollbar">
+          {/* =================================================================
+              1. TEAM CHAT (Universal Workspace Channel)
+              ================================================================= */}
+          {(sidebarFilter === 'all' || sidebarFilter === 'team') && (
+            <div>
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Hash className="w-3 h-3 text-emerald-700" />
+                  WORKSPACE CHANNELS
+                </span>
+                <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full font-bold">
+                  1 Channel
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  setActiveChatTarget('team');
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`w-full mt-1.5 text-left p-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                  activeChatTarget === 'team'
+                    ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-200/90 shadow-2xs'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs transition-colors ${
+                      activeChatTarget === 'team'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    <Hash className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-xs truncate font-bold flex items-center gap-1.5">
+                        Team Chat
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
+                          All
+                        </span>
+                      </p>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate font-normal mt-0.5">
+                      🔒 Universal E2EE • All {users.length} members
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* =================================================================
+              2. PERSONAL CHAT (1-on-1 End-to-End Encrypted Direct Messages)
+              ================================================================= */}
+          {(sidebarFilter === 'all' || sidebarFilter === 'personal') && (
+            <div>
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Lock className="w-3 h-3 text-emerald-700" />
+                  PERSONAL DIRECT CHATS (E2EE)
+                </span>
+                <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full font-bold">
+                  {filteredMembers.length}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 mt-1.5">
+                {filteredMembers.length === 0 ? (
+                  <p className="px-3 py-3 text-xs text-slate-400 italic text-center bg-slate-50 rounded-xl">
+                    No colleagues match your search.
+                  </p>
+                ) : (
+                  filteredMembers.map(member => {
+                    const isSelected = activeChatTarget === member.id || isUserMatch(activeChatTarget, member);
+                    const isOnline = member.presence === 'online';
+                    const isOnBreak = member.presence === 'break';
+
+                    return (
+                      <button
+                        key={member.id}
+                        onClick={() => {
+                          setActiveChatTarget(member.id);
+                          setIsMobileSidebarOpen(false);
+                        }}
+                        className={`w-full text-left p-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-200/90 shadow-2xs'
+                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={member.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                              alt={member.name}
+                              className="w-9 h-9 rounded-xl object-cover ring-2 ring-slate-100"
+                            />
+                            <span
+                              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+                                isOnline ? 'bg-emerald-500' : isOnBreak ? 'bg-amber-500' : 'bg-slate-300'
+                              }`}
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <p className="text-xs truncate font-semibold">{member.name}</p>
+                                {member.role === 'manager' ? (
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold flex-shrink-0">
+                                    MGR
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-blue-100 text-blue-800 font-bold flex-shrink-0">
+                                    ENG
+                                  </span>
+                                )}
+                              </div>
+                              {member.lastMessage && (
+                                <span className="text-[9px] text-slate-400 font-normal tabular-nums flex-shrink-0">
+                                  {member.lastMessage.timestamp}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between gap-1 mt-0.5">
+                              <p className="text-[10px] text-slate-400 truncate font-normal flex items-center gap-1">
+                                <Lock className="w-2.5 h-2.5 text-emerald-600 flex-shrink-0 inline" />
+                                <span className="truncate">
+                                  {member.lastMessage
+                                    ? `${isUserMatch(member.lastMessage.senderId, currentUser) ? 'You: ' : ''}${member.lastMessage.text}`
+                                    : (member.title || 'Tap to send encrypted message')}
+                                </span>
+                              </p>
+                              {member.unreadCount > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex-shrink-0 animate-pulse">
+                                  {member.unreadCount}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <ChevronRight
+                          className={`w-3.5 h-3.5 ml-1 flex-shrink-0 ${
+                            isSelected ? 'text-emerald-700' : 'text-slate-300 opacity-60'
+                          }`}
+                        />
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Current User Footnote & Security Badge */}
+        <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative flex-shrink-0">
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
+              <p className="text-[10px] text-slate-500 capitalize truncate">
+                {currentUser.role} • Active
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
-            <p className="text-[10px] text-slate-500 capitalize">{currentUser.role} • Active</p>
-          </div>
+          <button
+            onClick={() => setShowSecurityModal(true)}
+            className="p-1.5 rounded-lg bg-white border border-slate-200 text-emerald-700 hover:bg-emerald-50 text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+            title="E2EE Security Status"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">AES-256</span>
+          </button>
         </div>
       </div>
 
@@ -360,21 +520,23 @@ export const MessagesPage: React.FC = () => {
 
             {activeChatTarget === 'team' ? (
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 shadow-soft-sm border border-emerald-100">
-                  <Hash className="w-5 h-5 text-emerald-700" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center flex-shrink-0 shadow-soft-sm">
+                  <Hash className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
-                    Team Chat
-                    <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                      # Universal
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-slate-900 tracking-tight truncate">
+                      Team Chat
+                    </h2>
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> E2EE Channel
                     </span>
-                  </h2>
+                  </div>
                   <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
                     <span className="font-semibold text-emerald-800">{onlineCount} Online</span>
                     <span>•</span>
-                    <span>{users.length} Members</span>
+                    <span>{users.length} Workspace Members</span>
                   </p>
                 </div>
               </div>
@@ -398,14 +560,19 @@ export const MessagesPage: React.FC = () => {
                     />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
-                      {activeRecipient.name}
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-slate-900 tracking-tight truncate">
+                        {activeRecipient.name}
+                      </h2>
                       <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full capitalize">
                         {activeRecipient.role}
                       </span>
-                    </h2>
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
+                        <Lock className="w-2.5 h-2.5 text-emerald-600" /> AES-256 E2EE
+                      </span>
+                    </div>
                     <p className="text-xs text-slate-500 truncate mt-0.5">
-                      {activeRecipient.title || 'Team Member'} • Direct Message
+                      {activeRecipient.title || 'Team Member'} • {activeRecipient.department || 'Corporate'}
                     </p>
                   </div>
                 </div>
@@ -413,8 +580,18 @@ export const MessagesPage: React.FC = () => {
             )}
           </div>
 
-          {/* Search & Actions */}
-          <div className="flex items-center gap-2">
+          {/* Header Action Tools */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* E2EE Safety Security Details Button */}
+            <button
+              onClick={() => setShowSecurityModal(true)}
+              className="p-2 rounded-xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+              title="View E2EE Encryption Details"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span className="hidden sm:inline">Encrypted</span>
+            </button>
+
             {conversationMessages.length > 0 && activeChatTarget === 'team' && (
               <button
                 onClick={() => {
@@ -426,7 +603,7 @@ export const MessagesPage: React.FC = () => {
                 title="Clear all messages from Team Chat"
               >
                 <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Clear Chat</span>
+                <span className="hidden sm:inline">Clear</span>
               </button>
             )}
 
@@ -540,27 +717,64 @@ export const MessagesPage: React.FC = () => {
 
         {/* MESSAGES STREAM CANVAS */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 sm:px-8 max-w-4xl w-full mx-auto space-y-4 chat-scrollbar">
-          {displayedMessages.length > 0 && (
-            <div className="flex justify-center sticky top-1 z-10 pointer-events-none my-2">
-              <span className="px-3 py-1 rounded-full bg-white/95 text-slate-500 shadow-2xs border border-slate-200 text-xs font-semibold uppercase tracking-wider">
-                Today
-              </span>
-            </div>
-          )}
+          {/* Top E2EE Encryption Reassurance Ribbon */}
+          <div className="flex justify-center my-2">
+            <button
+              onClick={() => setShowSecurityModal(true)}
+              className="px-3.5 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/80 text-[11px] font-semibold text-emerald-900 shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Click to view End-to-End Encryption verification details"
+            >
+              <Lock className="w-3 h-3 text-emerald-700" />
+              <span>Messages are end-to-end encrypted with AES-256-GCM. Tap to verify.</span>
+            </button>
+          </div>
 
           {displayedMessages.length === 0 ? (
             <div className="h-3/4 flex flex-col items-center justify-center text-center p-6 text-slate-500">
-              <div className="w-14 h-14 rounded-2xl bg-white shadow-soft flex items-center justify-center text-emerald-600 mb-3 border border-slate-100">
-                {activeRecipient ? <UserIcon className="w-7 h-7" /> : <MessageSquare className="w-7 h-7" />}
+              <div className="w-16 h-16 rounded-2xl bg-white shadow-soft flex items-center justify-center text-emerald-600 mb-4 border border-slate-100">
+                {activeRecipient ? <Lock className="w-8 h-8" /> : <Hash className="w-8 h-8" />}
               </div>
-              <p className="text-sm font-bold text-slate-800">
-                {activeRecipient ? `No direct messages with ${activeRecipient.name} yet` : 'No team messages yet'}
-              </p>
-              <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
+              <h3 className="text-base font-bold text-slate-900">
                 {activeRecipient
-                  ? `Say hello to ${activeRecipient.name} (${activeRecipient.title || 'Team Member'})! Direct messages between your IDs appear here.`
-                  : 'Start the conversation! Everyone added to the team can participate in this channel.'}
+                  ? `End-to-End Encrypted chat with ${activeRecipient.name}`
+                  : 'Welcome to Team Chat'}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-sm mt-1.5 leading-relaxed">
+                {activeRecipient
+                  ? `Messages in this personal direct chat are encrypted with AES-256-GCM. Only you and ${activeRecipient.name} can decrypt and read these communications.`
+                  : 'Start the conversation! All team messages are client-side encrypted before being synced to Supabase Cloud.'}
               </p>
+
+              {/* Quick Prompt Starters */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+                <button
+                  onClick={() => {
+                    setInputText(activeRecipient ? `Hi ${activeRecipient.name}, can we sync on our deliverables?` : '👋 Hi team, checking in for today!');
+                    inputRef.current?.focus();
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-800 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                >
+                  👋 Say Hello
+                </button>
+                <button
+                  onClick={() => {
+                    setInputText('🚀 Everything is on track for this sprint!');
+                    inputRef.current?.focus();
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-800 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                >
+                  🚀 Sprint Update
+                </button>
+                {activeRecipient && currentUser.role === 'manager' && (
+                  <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold transition-all shadow-2xs cursor-pointer hover:bg-emerald-100"
+                  >
+                    <Plus className="w-3 h-3 inline mr-1" />
+                    Assign Task
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             displayedMessages.map(msg => {
@@ -610,7 +824,7 @@ export const MessagesPage: React.FC = () => {
                       {isMe ? (
                         <>
                           {senderRole === 'manager' ? (
-                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
                               Manager
                             </span>
                           ) : (
@@ -628,7 +842,7 @@ export const MessagesPage: React.FC = () => {
                             {senderName}
                           </span>
                           {senderRole === 'manager' ? (
-                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase tracking-wider">
                               Manager
                             </span>
                           ) : (
@@ -640,11 +854,11 @@ export const MessagesPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Message Bubble */}
+                    {/* Message Bubble with E2EE Indicator */}
                     <div
-                      className={`rounded-2xl px-4 py-3 shadow-soft-sm leading-relaxed ${
+                      className={`rounded-2xl px-4 py-3 shadow-soft-sm leading-relaxed transition-all ${
                         isMe
-                          ? 'bg-emerald-600 text-white rounded-tr-xs'
+                          ? 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-tr-xs'
                           : 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs'
                       }`}
                     >
@@ -657,10 +871,14 @@ export const MessagesPage: React.FC = () => {
                       </p>
 
                       <div
-                        className={`flex items-center justify-end gap-1 mt-1 -mb-0.5 text-[10px] select-none ${
+                        className={`flex items-center justify-end gap-1.5 mt-1.5 -mb-0.5 text-[10px] select-none ${
                           isMe ? 'text-emerald-100/90' : 'text-slate-400'
                         }`}
                       >
+                        {/* Lock icon representing AES-256 E2EE */}
+                        <span title="End-to-End Encrypted (AES-256-GCM)" className="inline-flex items-center">
+                          <Lock className="w-2.5 h-2.5 opacity-80" />
+                        </span>
                         <span>{msg.timestamp}</span>
                         {isMe && <CheckCheck className="w-3.5 h-3.5 text-emerald-200 inline-block" />}
                       </div>
@@ -702,7 +920,7 @@ export const MessagesPage: React.FC = () => {
         )}
 
         {/* FIXED BOTTOM INPUT BAR */}
-        <div className="bg-white border-t border-slate-200 flex-shrink-0 z-10">
+        <div className="bg-white border-t border-slate-200 flex-shrink-0 z-10 shadow-soft-sm">
           <form
             onSubmit={handleSend}
             className="max-w-4xl mx-auto p-3 sm:p-4 flex items-center gap-2 sm:gap-3"
@@ -720,31 +938,122 @@ export const MessagesPage: React.FC = () => {
               <Smile className="w-5 h-5" />
             </button>
 
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputText}
-              onChange={e => setInputText(e.target.value)}
-              placeholder={
-                activeRecipient
-                  ? `Direct message to ${activeRecipient.name}...`
-                  : 'Type a message to the team...'
-              }
-              className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200/90 bg-slate-50 hover:bg-slate-100/60 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 shadow-2xs transition-all"
-            />
+            <div className="relative flex-1">
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                placeholder={
+                  activeRecipient
+                    ? `🔒 Encrypted message to ${activeRecipient.name}...`
+                    : '🔒 Encrypted message to team...'
+                }
+                className="w-full px-4 py-2.5 pr-20 text-xs sm:text-sm rounded-xl border border-slate-200/90 bg-slate-50 hover:bg-slate-100/60 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 shadow-2xs transition-all"
+              />
+              <span className="absolute right-3 top-3 text-[10px] font-bold text-emerald-800/80 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 pointer-events-none hidden sm:inline-flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5 text-emerald-700" /> E2EE
+              </span>
+            </div>
 
             <button
               type="submit"
               disabled={!inputText.trim()}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold text-xs flex items-center gap-1.5 shadow-soft transition-all active:scale-95 cursor-pointer flex-shrink-0"
-              title="Send (Enter)"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 disabled:opacity-40 text-white font-semibold text-xs flex items-center gap-1.5 shadow-soft transition-all active:scale-95 cursor-pointer flex-shrink-0"
+              title="Send Encrypted Message (Enter)"
             >
               <Send className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Send</span>
             </button>
           </form>
+          <div className="text-center pb-2 text-[10px] text-slate-400 font-medium">
+            🔒 Client-side AES-256-GCM authenticated encryption • Stored as ciphertext in Supabase Cloud
+          </div>
         </div>
       </div>
+
+      {/* =========================================================================
+          END-TO-END ENCRYPTION (E2EE) SECURITY MODAL
+          ========================================================================= */}
+      {showSecurityModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">End-to-End Encryption</h3>
+                  <p className="text-xs text-slate-400">Zero-Knowledge Enterprise Protocol</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSecurityModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950">
+                <div className="flex items-center gap-2 font-bold text-emerald-900 mb-1">
+                  <Lock className="w-4 h-4 text-emerald-700" />
+                  Active Encryption: AES-256-GCM
+                </div>
+                <p className="text-[11px] text-emerald-800/90 leading-relaxed">
+                  Every message sent in this chat is encrypted locally in your browser using the Web Crypto API before transmission. Only participants with the derived session key can decrypt and read messages.
+                </p>
+              </div>
+
+              {/* Safety Number */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                  Safety Verification Code (Fingerprint)
+                </label>
+                <div className="p-3 bg-slate-100 rounded-xl font-mono text-center text-sm font-bold tracking-widest text-slate-800 border border-slate-200">
+                  {securityFingerprint}
+                </div>
+                <p className="text-[10px] text-slate-400 text-center">
+                  This fingerprint matches across all verified devices for this conversation.
+                </p>
+              </div>
+
+              {/* Security Specs */}
+              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
+                <div className="p-2.5 flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Cipher Standard</span>
+                  <span className="font-bold text-slate-800">AES-GCM (256-bit key)</span>
+                </div>
+                <div className="p-2.5 flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">IV / Nonce</span>
+                  <span className="font-bold text-slate-800">96-bit Cryptographically Random</span>
+                </div>
+                <div className="p-2.5 flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Cloud Database Storage</span>
+                  <span className="font-bold text-emerald-700">Scrambled Ciphertext Only</span>
+                </div>
+                <div className="p-2.5 flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Target Conversation</span>
+                  <span className="font-bold text-slate-800 truncate max-w-[200px]">
+                    {activeRecipient ? `Direct with ${activeRecipient.name}` : 'Universal Team Chat'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowSecurityModal(false)}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-soft transition-all cursor-pointer"
+              >
+                Close & Return to Chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

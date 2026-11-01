@@ -1,9 +1,19 @@
 import { Project, Task, User, ActivityLog, Notification, ChatMessage, PresenceStatus } from '../types';
+import { encryptTextMessage, decryptTextMessage } from './encryption';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://xdwkcybxgqdtnpnypxfj.supabase.co';
-const SUPABASE_ANON_KEY =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhkd2tjeWJ4Z3FkdG5wbnlweGZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0OTY3NDksImV4cCI6MjEwOTA3Mjc0OX0.e596Uej5lQi3QmRmwZIu7bV-Cw165Awo0vQSwqAjA2g';
+const envUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+
+// Active verified project is xdwkcybxgqdtnpnypxfj
+export const SUPABASE_URL =
+  envUrl && !envUrl.includes('kgkggknznzumdhujsilj')
+    ? envUrl
+    : 'https://xdwkcybxgqdtnpnypxfj.supabase.co';
+
+export const SUPABASE_ANON_KEY =
+  envKey && !envKey.includes('kgkggknznzumdhujsilj') && !SUPABASE_URL.includes('xdwkcybxgqdtnpnypxfj')
+    ? envKey
+    : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhkd2tjeWJ4Z3FkdG5wbnlweGZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0OTY3NDksImV4cCI6MjEwOTA3Mjc0OX0.e596Uej5lQi3QmRmwZIu7bV-Cw165Awo0vQSwqAjA2g';
 
 export type SupabaseStatus = 'connected' | 'connecting' | 'needs_migration' | 'disconnected';
 
@@ -492,18 +502,29 @@ export async function fetchMessagesFromSupabase(): Promise<ChatMessage[] | null>
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.map((row: any): ChatMessage => ({
-      id: row.id,
-      senderId: row.sender_id,
-      senderName: row.sender_name,
-      senderAvatar: row.sender_avatar,
-      senderRole: row.sender_role,
-      senderTitle: row.sender_title,
-      text: row.text,
-      timestamp: row.timestamp || new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      channelId: row.channel_id,
-      recipientId: row.recipient_id || undefined
-    }));
+    return await Promise.all(
+      data.map(async (row: any): Promise<ChatMessage> => {
+        const conversationId = row.recipient_id
+          ? `dm-${[row.sender_id, row.recipient_id].sort().join('-')}`
+          : (row.channel_id || 'ch-team-chat');
+
+        const { text: decryptedText, isEncrypted } = await decryptTextMessage(row.text, conversationId);
+
+        return {
+          id: row.id,
+          senderId: row.sender_id,
+          senderName: row.sender_name,
+          senderAvatar: row.sender_avatar,
+          senderRole: row.sender_role,
+          senderTitle: row.sender_title,
+          text: decryptedText,
+          timestamp: row.timestamp || new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          channelId: row.channel_id,
+          recipientId: row.recipient_id || undefined,
+          isEncrypted: isEncrypted || (row.text && row.text.startsWith('enc:v1:'))
+        };
+      })
+    );
   } catch (e) {
     console.warn('[Supabase] fetchMessages error:', e);
     return null;
@@ -512,6 +533,12 @@ export async function fetchMessagesFromSupabase(): Promise<ChatMessage[] | null>
 
 export async function insertMessageToSupabase(msg: ChatMessage): Promise<boolean> {
   try {
+    const conversationId = msg.recipientId
+      ? `dm-${[msg.senderId, msg.recipientId].sort().join('-')}`
+      : (msg.channelId || 'ch-team-chat');
+
+    const cipherText = await encryptTextMessage(msg.text, conversationId);
+
     const payload = {
       id: msg.id,
       sender_id: msg.senderId,
@@ -519,7 +546,7 @@ export async function insertMessageToSupabase(msg: ChatMessage): Promise<boolean
       sender_avatar: msg.senderAvatar,
       sender_role: msg.senderRole,
       sender_title: msg.senderTitle,
-      text: msg.text,
+      text: cipherText,
       timestamp: msg.timestamp,
       channel_id: msg.channelId || 'ch-team-chat',
       recipient_id: msg.recipientId || null
