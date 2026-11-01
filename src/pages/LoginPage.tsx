@@ -11,7 +11,6 @@ import {
   Clock,
   ShieldCheck,
   Users,
-  Smartphone,
   X
 } from 'lucide-react';
 
@@ -44,18 +43,7 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Quick 1-click login
-  const handleQuickLogin = async (userItem: (typeof users)[0]) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const identifier = userItem.username || userItem.email;
-    const pwd = userItem.password || 'password123';
-    try {
-      await login(identifier, pwd);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
 
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-800 flex items-center justify-center p-3 sm:p-6 overflow-y-auto font-sans selection:bg-emerald-500 selection:text-white py-6 md:py-0">
@@ -281,44 +269,6 @@ export const LoginPage: React.FC = () => {
             </form>
           </div>
 
-          {/* Quick 1-Click Demo Profiles */}
-          <div className="pt-4 mt-3 border-t border-slate-100">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2 text-center">
-              Or 1-click demo login
-            </span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {users.slice(0, 4).map(u => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => handleQuickLogin(u)}
-                  className="px-2 py-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 text-left transition-all flex items-center justify-between text-xs group"
-                >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <img src={u.avatar} alt={u.name} className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
-                    <span className="font-medium text-slate-800 text-[11px] truncate">{u.name.split(' ')[0]}</span>
-                  </div>
-                  <span
-                    className={`text-[9px] px-1 py-0.2 rounded font-bold uppercase flex-shrink-0 ${
-                      u.role === 'manager'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {u.role === 'manager' ? 'Mgr' : 'Emp'}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* PWA Mobile Badge */}
-            <div className="pt-2 text-center">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium border border-slate-200">
-                <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                <span>PWA &amp; Mobile Ready • Installable App</span>
-              </span>
-            </div>
-          </div>
         </div>
       </div>
 
