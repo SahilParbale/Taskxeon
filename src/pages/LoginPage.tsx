@@ -286,68 +286,43 @@ export const LoginPage: React.FC = () => {
               </button>
             </form>
 
-            {/* 1-Click Demo Login for Testing */}
+            {/* 1-Click Testing Login */}
             <div className="mt-4 pt-3.5 border-t border-slate-100 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  1-Click Testing Login
+                  Quick Manager Access
                 </span>
                 <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                  Instant Access
+                  Workspace Admin
                 </span>
               </div>
 
-              {/* Software Development Team Personas */}
-              <div className="space-y-1">
-                <div className="text-[10px] font-bold text-slate-600">Software Development:</div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleQuickLogin('shreyasjadhav@gmail.com', 'shreyas123')}
-                    className="p-2 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
-                  >
-                    <span className="font-bold text-xs text-slate-900">Shreyas Jadhav</span>
-                    <span className="text-[10px] text-emerald-800 font-semibold">Software Manager</span>
-                  </button>
+              {/* Department Manager Personas */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleQuickLogin('shreyasjadhav@gmail.com', 'shreyas123')}
+                  className="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
+                >
+                  <span className="font-bold text-xs text-slate-900">Shreyas Jadhav</span>
+                  <span className="text-[10px] text-emerald-800 font-semibold">Software Manager</span>
+                </button>
 
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleQuickLogin('sahilparbale@gmail.com', 'password123')}
-                    className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
-                  >
-                    <span className="font-bold text-xs text-slate-900">Sahil Parbale</span>
-                    <span className="text-[10px] text-slate-500 font-medium">Dev Engineer</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleQuickLogin('priya.marketing@taskflow.io', 'marketing123')}
+                  className="p-2.5 rounded-lg border border-teal-200 bg-teal-50/70 hover:bg-teal-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
+                >
+                  <span className="font-bold text-xs text-slate-900">Priya Sharma</span>
+                  <span className="text-[10px] text-teal-800 font-semibold">Marketing Manager</span>
+                </button>
               </div>
 
-              {/* Marketing Team Personas */}
-              <div className="space-y-1 pt-0.5">
-                <div className="text-[10px] font-bold text-slate-600">Marketing Team:</div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleQuickLogin('priya.marketing@taskflow.io', 'marketing123')}
-                    className="p-2 rounded-lg border border-teal-200 bg-teal-50/70 hover:bg-teal-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
-                  >
-                    <span className="font-bold text-xs text-slate-900">Priya Sharma</span>
-                    <span className="text-[10px] text-teal-800 font-semibold">Marketing Manager</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleQuickLogin('aarav.mehta@taskflow.io', 'marketing123')}
-                    className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
-                  >
-                    <span className="font-bold text-xs text-slate-900">Aarav Mehta</span>
-                    <span className="text-[10px] text-slate-500 font-medium">Growth Specialist</span>
-                  </button>
-                </div>
-              </div>
+              <p className="text-[10px] text-slate-400 text-center pt-0.5">
+                Staff members sign in with credentials issued by their manager.
+              </p>
             </div>
           </div>
 
@@ -361,7 +336,7 @@ export const LoginPage: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-1.5 text-emerald-700">
                 <KeyRound className="w-4 h-4" />
-                <h3 className="text-xs font-bold text-slate-900">Demo Credentials</h3>
+                <h3 className="text-xs font-bold text-slate-900">Manager Credentials</h3>
               </div>
               <button
                 onClick={() => setShowForgotModal(false)}
@@ -380,7 +355,7 @@ export const LoginPage: React.FC = () => {
                 <div className="space-y-1.5 mt-1.5">
                   <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-slate-900 text-xs">Shreyas (Manager)</div>
+                      <div className="font-bold text-slate-900 text-xs">Shreyas Jadhav</div>
                       <div className="text-[10px] text-slate-500 font-mono">shreyas123</div>
                     </div>
                     <button
@@ -388,23 +363,6 @@ export const LoginPage: React.FC = () => {
                       onClick={() => {
                         setUsernameOrEmail('shreyasjadhav@gmail.com');
                         setPassword('shreyas123');
-                        setShowForgotModal(false);
-                      }}
-                      className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-slate-900 text-xs">Sahil (Dev Lead)</div>
-                      <div className="text-[10px] text-slate-500 font-mono">password123</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsernameOrEmail('sahilparbale@gmail.com');
-                        setPassword('password123');
                         setShowForgotModal(false);
                       }}
                       className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
@@ -422,7 +380,7 @@ export const LoginPage: React.FC = () => {
                 <div className="space-y-1.5 mt-1.5">
                   <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-slate-900 text-xs">Priya (Marketing Mgr)</div>
+                      <div className="font-bold text-slate-900 text-xs">Priya Sharma</div>
                       <div className="text-[10px] text-slate-500 font-mono">marketing123</div>
                     </div>
                     <button
@@ -437,24 +395,11 @@ export const LoginPage: React.FC = () => {
                       Apply
                     </button>
                   </div>
-                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-slate-900 text-xs">Aarav (Growth Spec)</div>
-                      <div className="text-[10px] text-slate-500 font-mono">marketing123</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsernameOrEmail('aarav.mehta@taskflow.io');
-                        setPassword('marketing123');
-                        setShowForgotModal(false);
-                      }}
-                      className="px-2 py-0.5 rounded bg-teal-700 hover:bg-teal-800 text-white font-semibold text-[11px] cursor-pointer"
-                    >
-                      Apply
-                    </button>
-                  </div>
                 </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed">
+                Managers can onboard new employees anytime under the <strong>Team</strong> section with custom username and password.
               </div>
             </div>
 

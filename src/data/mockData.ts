@@ -15,19 +15,6 @@ export const INITIAL_USERS: User[] = [
     bio: 'Oversees software engineering, sprint allocation, and technical deliverables.'
   },
   {
-    id: 'user-2',
-    name: 'Sahil Parbale',
-    email: 'sahilparbale@gmail.com',
-    username: 'sahil',
-    password: 'password123',
-    role: 'employee',
-    title: 'Lead Full-Stack Engineer',
-    department: 'Engineering',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    presence: 'online',
-    bio: 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.'
-  },
-  {
     id: 'user-marketing-mgr',
     name: 'Priya Sharma',
     email: 'priya.marketing@taskflow.io',
@@ -39,135 +26,12 @@ export const INITIAL_USERS: User[] = [
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     presence: 'online',
     bio: 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.'
-  },
-  {
-    id: 'user-marketing-emp',
-    name: 'Aarav Mehta',
-    email: 'aarav.mehta@taskflow.io',
-    username: 'aarav',
-    password: 'marketing123',
-    role: 'employee',
-    title: 'Growth & Content Specialist',
-    department: 'Marketing',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    presence: 'online',
-    bio: 'Executes organic social media, content production, paid search campaigns, and conversion copy.'
   }
 ];
 
-export const INITIAL_PROJECTS: Project[] = [
-  {
-    id: 'proj-eng-1',
-    name: 'Platform Core Sprint',
-    key: 'DEV',
-    description: 'Real-time task synchronization, end-to-end encryption, and CI/CD automation.',
-    health: 'on_track',
-    deadline: '2026-12-15',
-    members: ['user-1', 'user-2'],
-    progress: 65,
-    department: 'Engineering',
-    lastUpdatedBy: 'Shreyas Jadhav',
-    lastUpdatedAt: 'Just now'
-  },
-  {
-    id: 'proj-mkt-1',
-    name: 'Taskflow Cloud CRM & ERP Suite',
-    key: 'CRM',
-    description: 'Enterprise commercial product. Field sales and outreach representatives track client calls, on-site meetings, live demos, and deal closures.',
-    health: 'on_track',
-    deadline: '2026-12-31',
-    members: ['user-marketing-mgr', 'user-marketing-emp'],
-    progress: 40,
-    department: 'Marketing',
-    lastUpdatedBy: 'Priya Sharma',
-    lastUpdatedAt: 'Just now'
-  }
-];
+export const INITIAL_PROJECTS: Project[] = [];
 
-export const INITIAL_TASKS: Task[] = [
-  {
-    id: 'task-eng-1',
-    title: 'Implement AES-256 E2EE Channel Security',
-    description: 'Ensure all chat messages and DM channels use authenticated WebCrypto AES-GCM encryption.',
-    projectId: 'proj-eng-1',
-    assigneeId: 'user-2',
-    createdById: 'user-1',
-    priority: 'high',
-    status: 'in_progress',
-    dueDate: '2026-11-10',
-    createdAt: new Date().toISOString(),
-    tags: ['Security', 'API', 'WebCrypto'],
-    department: 'Engineering'
-  },
-  {
-    id: 'lead-mkt-1',
-    title: 'Zenith Logistics & Supply',
-    description: 'Introductory qualification call to understand fleet management requirements.',
-    projectId: 'proj-mkt-1',
-    assigneeId: 'user-marketing-emp',
-    createdById: 'user-marketing-mgr',
-    priority: 'high',
-    status: 'calling',
-    dueDate: '2026-11-03',
-    createdAt: new Date().toISOString(),
-    clientContact: 'Sunil Nair (Director)',
-    clientPhone: '+91 98210 11223',
-    clientLocation: 'Andheri East, Mumbai',
-    tags: ['Calling', 'Inbound Lead'],
-    department: 'Marketing'
-  },
-  {
-    id: 'lead-mkt-2',
-    title: 'Apex Healthcare Network',
-    description: 'On-site corporate visit to inspect hospital facility and meet clinical admin team.',
-    projectId: 'proj-mkt-1',
-    assigneeId: 'user-marketing-emp',
-    createdById: 'user-marketing-mgr',
-    priority: 'urgent',
-    status: 'field_visit',
-    dueDate: '2026-11-04',
-    createdAt: new Date().toISOString(),
-    clientContact: 'Dr. Rajesh Iyer',
-    clientPhone: '+91 98330 44556',
-    clientLocation: 'BKC Complex, Mumbai',
-    tags: ['Field Visit', 'Enterprise'],
-    department: 'Marketing'
-  },
-  {
-    id: 'lead-mkt-3',
-    title: 'Reliance Retail Franchise',
-    description: 'Live solution demonstration scheduled with procurement department.',
-    projectId: 'proj-mkt-1',
-    assigneeId: 'user-marketing-emp',
-    createdById: 'user-marketing-mgr',
-    priority: 'high',
-    status: 'demo',
-    dueDate: '2026-11-06',
-    createdAt: new Date().toISOString(),
-    clientContact: 'Pooja Deshmukh (Procurement Lead)',
-    clientPhone: '+91 98700 77889',
-    clientLocation: 'Navi Mumbai Hub',
-    tags: ['Product Demo', 'Corporate'],
-    department: 'Marketing'
-  },
-  {
-    id: 'lead-mkt-4',
-    title: 'Metropolis Diagnostic Labs',
-    description: 'Contract finalized. 50 user licenses approved following on-site demo.',
-    projectId: 'proj-mkt-1',
-    assigneeId: 'user-marketing-emp',
-    createdById: 'user-marketing-mgr',
-    priority: 'medium',
-    status: 'completed',
-    dueDate: '2026-11-01',
-    createdAt: new Date().toISOString(),
-    clientContact: 'Vikram Malhotra',
-    clientPhone: '+91 98190 33445',
-    clientLocation: 'Worli, Mumbai',
-    tags: ['Closed Won', 'Signed Contract'],
-    department: 'Marketing'
-  }
-];
+export const INITIAL_TASKS: Task[] = [];
 
 export const INITIAL_NOTIFICATIONS: Notification[] = [];
 

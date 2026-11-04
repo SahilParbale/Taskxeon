@@ -319,69 +319,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const uName = user.name ? user.name.trim().toLowerCase() : '';
     const uUsername = user.username ? user.username.trim().toLowerCase() : '';
 
-    // 1. Direct ID match
+    // Direct ID, email, username or name match
     if (tAssignee === uId) return true;
-
-    // 2. Direct Email match
     if (uEmail && tAssignee === uEmail) return true;
-
-    // 3. Direct Username match
     if (uUsername && tAssignee === uUsername) return true;
+    if (uName && tAssignee === uName) return true;
 
-    // 4. Marketing Employee Persona match (Aarav Mehta) across all known aliases & IDs
-    const isUserAarav =
-      uId === 'user-marketing-emp' ||
-      uEmail.includes('aarav') ||
-      uName.includes('aarav') ||
-      uUsername === 'aarav';
-
-    const isTaskAssignedAarav =
-      tAssignee === 'user-marketing-emp' ||
-      tAssignee.includes('aarav') ||
-      tAssignee === 'aarav.mehta@taskflow.io';
-
-    if (isUserAarav && isTaskAssignedAarav) return true;
-
-    // 5. Software Dev Employee Persona match (Sahil Parbale) across all known aliases & IDs
-    const isUserSahil =
-      uId === 'user-2' ||
-      uEmail.includes('sahil') ||
-      uName.includes('sahil') ||
-      uUsername === 'sahil';
-
-    const isTaskAssignedSahil =
-      tAssignee === 'user-2' ||
-      tAssignee.includes('sahil') ||
-      tAssignee === 'sahilparbale@gmail.com';
-
-    if (isUserSahil && isTaskAssignedSahil) return true;
-
-    // 6. Marketing Manager Persona match (Priya Sharma)
-    const isUserPriya =
-      uId === 'user-marketing-mgr' ||
-      uEmail.includes('priya') ||
-      uName.includes('priya') ||
-      uUsername.includes('priya');
-
-    const isTaskAssignedPriya =
-      tAssignee === 'user-marketing-mgr' ||
-      tAssignee.includes('priya') ||
-      tAssignee === 'priya.marketing@taskflow.io';
-
+    // Resilient Manager Persona matching
+    const isUserPriya = uId === 'user-marketing-mgr' || uEmail.includes('priya') || uUsername.includes('priya');
+    const isTaskAssignedPriya = tAssignee === 'user-marketing-mgr' || tAssignee.includes('priya') || tAssignee === 'priya.marketing@taskflow.io';
     if (isUserPriya && isTaskAssignedPriya) return true;
 
-    // 7. Software Manager Persona match (Shreyas Jadhav)
-    const isUserShreyas =
-      uId === 'user-1' ||
-      uEmail.includes('shreyas') ||
-      uName.includes('shreyas') ||
-      uUsername.includes('shreyas');
-
-    const isTaskAssignedShreyas =
-      tAssignee === 'user-1' ||
-      tAssignee.includes('shreyas') ||
-      tAssignee === 'shreyasjadhav@gmail.com';
-
+    const isUserShreyas = uId === 'user-1' || uEmail.includes('shreyas') || uUsername.includes('shreyas');
+    const isTaskAssignedShreyas = tAssignee === 'user-1' || tAssignee.includes('shreyas') || tAssignee === 'shreyasjadhav@gmail.com';
     if (isUserShreyas && isTaskAssignedShreyas) return true;
 
     return false;
@@ -392,8 +342,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return (
       users.find(u => u.id === currentUserId) ||
       (currentUserId === 'user-marketing-mgr' ? users.find(u => (u.email && u.email.includes('priya')) || (u.name && u.name.includes('Priya'))) : undefined) ||
-      (currentUserId === 'user-marketing-emp' ? users.find(u => (u.email && u.email.includes('aarav')) || (u.name && u.name.includes('Aarav'))) : undefined) ||
-      (currentUserId === 'user-2' ? users.find(u => (u.name && u.name.includes('Sahil')) || (u.email && u.email.includes('sahil'))) : undefined) ||
+      (currentUserId === 'user-1' ? users.find(u => (u.email && u.email.includes('shreyas')) || (u.name && u.name.includes('Shreyas'))) : undefined) ||
       users[0] ||
       INITIAL_USERS[0]
     );
@@ -546,7 +495,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const isSelf = (senderId?: string, senderName?: string): boolean => {
     const activeId = currentUserIdRef.current;
     const activeUser = currentUserRef.current;
-    if (senderId && activeId && (senderId === activeId || (activeId === 'user-2' && (senderId.includes('sahil') || senderId === 'user-1793433013262')))) return true;
+    if (senderId && activeId && senderId === activeId) return true;
     if (activeUser) {
       if (senderId && (senderId === activeUser.id || senderId === activeUser.username || senderId === activeUser.email)) return true;
       if (senderName && (senderName === activeUser.name || senderName.toLowerCase() === activeUser.name.toLowerCase())) return true;
@@ -690,21 +639,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               localPending.forEach(lt => upsertTaskToSupabase(lt).catch(() => {}));
             }
 
-            // Ensure marketing default sample tasks are seeded if no marketing tasks exist in the database yet
-            const hasMarketingTask = [...hydratedCloudTasks, ...localPending].some(t =>
-              (t.id && (t.id.startsWith('lead-') || t.id.includes('mkt'))) ||
-              ['calling', 'field_visit', 'demo'].includes(t.status) ||
-              (t.department && t.department.toLowerCase().includes('market'))
-            );
-
-            const mktDefaults = !hasMarketingTask
-              ? INITIAL_TASKS.filter(it => it.department === 'Marketing' && !cloudIds.has(it.id) && !deletedTaskIdsRef.current.includes(it.id))
-              : [];
-
-            if (!hasMarketingTask && mktDefaults.length > 0) {
-              mktDefaults.forEach(mt => upsertTaskToSupabase(mt).catch(() => {}));
-            }
-
             if (isSilent) {
               const prevIds = new Set(prevTasks.map(t => t.id));
               const newlyAssigned = hydratedCloudTasks.filter(t => !prevIds.has(t.id) && isTaskAssignedToUser(t, currentUserRef.current));
@@ -719,7 +653,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 });
               }
             }
-            return [...hydratedCloudTasks, ...localPending, ...mktDefaults];
+            return [...hydratedCloudTasks, ...localPending];
           });
         }
 
@@ -741,16 +675,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               p => !deletedProjectIdsRef.current.includes(p.id)
             );
 
-            const hasMarketingProj = allProjects.some(p =>
-              (p.department && p.department.toLowerCase().includes('market')) || p.id.includes('mkt')
-            );
-            const mktProjDefaults = !hasMarketingProj
-              ? INITIAL_PROJECTS.filter(ip => ip.department === 'Marketing' && !cloudIds.has(ip.id) && !deletedProjectIdsRef.current.includes(ip.id))
-              : [];
-            if (!hasMarketingProj && mktProjDefaults.length > 0) {
-              mktProjDefaults.forEach(mp => upsertProjectToSupabase(mp).catch(() => {}));
-            }
-            return [...allProjects, ...mktProjDefaults];
+            return allProjects;
           });
         }
 
@@ -1746,16 +1671,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         nameLower === rawInput ||
         emailPrefix === rawInput ||
         ((rawInput === 'shreyasjadhav@gmail.com' || rawInput === 'shreyasjadhav' || rawInput === 'shreyas') && u.id === 'user-1') ||
-        ((rawInput === 'sahilparbale@gmail.com' || rawInput === 'sahil' || rawInput === 'sahilparbale') && (u.id === 'user-2' || (u.name && u.name.includes('Sahil')))) ||
-        ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || (u.name && u.name.includes('Priya')) || (u.email && u.email.includes('priya')))) ||
-        ((rawInput === 'aarav.mehta@taskflow.io' || rawInput === 'aarav') && (u.id === 'user-marketing-emp' || (u.name && u.name.includes('Aarav')) || (u.email && u.email.includes('aarav'))))
+        ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || (u.email && u.email.includes('priya'))))
       );
     });
 
     if (!matchedUser) {
       return {
         success: false,
-        error: `No account found for "${usernameOrEmail}". Try Shreyas Jadhav (shreyasjadhav@gmail.com) for Software or Priya Sharma (priya.marketing@taskflow.io) for Marketing.`
+        error: `No account found for "${usernameOrEmail}". Sign in as Shreyas Jadhav (shreyasjadhav@gmail.com) for Software or Priya Sharma (priya.marketing@taskflow.io) for Marketing.`
       };
     }
 
@@ -1768,16 +1691,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Check password
     const expectedPassword = matchedUser.password || (
       matchedUser.id === 'user-1' ? 'shreyas123' :
-      matchedUser.id === 'user-marketing-mgr' || matchedUser.id === 'user-marketing-emp' ? 'marketing123' :
+      matchedUser.id === 'user-marketing-mgr' ? 'marketing123' :
       'password123'
     );
     const isPasswordValid =
       password === expectedPassword ||
       (matchedUser.id === 'user-1' && (password === 'shreyas123' || password === 'password123')) ||
-      (matchedUser.id === 'user-2' && (password === 'sahil123' || password === 'password123')) ||
-      (matchedUser.department && matchedUser.department.toLowerCase().includes('market') && (password === 'marketing123' || password === 'password123')) ||
-      password === 'password123' ||
-      password === 'taskflow123';
+      (matchedUser.id === 'user-marketing-mgr' && (password === 'marketing123' || password === 'password123')) ||
+      (matchedUser.department && matchedUser.department.toLowerCase().includes('market') && password === 'marketing123') ||
+      (matchedUser.password && password === matchedUser.password) ||
+      password === 'password123';
 
     if (!isPasswordValid) {
       const defaultPwdHint = matchedUser.id === 'user-1'

@@ -41,14 +41,7 @@ export const GlobalSearchModal: React.FC<{ isOpen: boolean; onClose: () => void 
     if (tAssignee === uId) return true;
     if (uEmail && tAssignee === uEmail) return true;
     if (uUsername && tAssignee === uUsername) return true;
-
-    const isUserAarav = uId === 'user-marketing-emp' || uEmail.includes('aarav') || uName.includes('aarav') || uUsername === 'aarav';
-    const isTaskAssignedAarav = tAssignee === 'user-marketing-emp' || tAssignee.includes('aarav') || tAssignee === 'aarav.mehta@taskflow.io';
-    if (isUserAarav && isTaskAssignedAarav) return true;
-
-    const isUserSahil = uId === 'user-2' || uEmail.includes('sahil') || uName.includes('sahil') || uUsername === 'sahil';
-    const isTaskAssignedSahil = tAssignee === 'user-2' || tAssignee.includes('sahil') || tAssignee === 'sahilparbale@gmail.com';
-    if (isUserSahil && isTaskAssignedSahil) return true;
+    if (uName && tAssignee === uName) return true;
 
     return false;
   };

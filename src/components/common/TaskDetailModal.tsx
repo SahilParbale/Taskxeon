@@ -92,14 +92,7 @@ export const TaskDetailModal: React.FC = () => {
     if (tAssignee === uId) return true;
     if (uEmail && tAssignee === uEmail) return true;
     if (uUsername && tAssignee === uUsername) return true;
-
-    const isUserAarav = uId === 'user-marketing-emp' || uEmail.includes('aarav') || uName.includes('aarav') || uUsername === 'aarav';
-    const isTaskAssignedAarav = tAssignee === 'user-marketing-emp' || tAssignee.includes('aarav') || tAssignee === 'aarav.mehta@taskflow.io';
-    if (isUserAarav && isTaskAssignedAarav) return true;
-
-    const isUserSahil = uId === 'user-2' || uEmail.includes('sahil') || uName.includes('sahil') || uUsername === 'sahil';
-    const isTaskAssignedSahil = tAssignee === 'user-2' || tAssignee.includes('sahil') || tAssignee === 'sahilparbale@gmail.com';
-    if (isUserSahil && isTaskAssignedSahil) return true;
+    if (uName && tAssignee === uName) return true;
 
     return false;
   };
@@ -109,7 +102,11 @@ export const TaskDetailModal: React.FC = () => {
   if (currentUser.role === 'employee' && !isTaskAssignedToUser(task, currentUser)) return null;
 
   const project = projects.find(p => p.id === task.projectId);
-  const assignee = users.find(u => u.id === task.assigneeId);
+  const assignee = users.find(u =>
+    u.id === task.assigneeId ||
+    (u.email && u.email.toLowerCase() === (task.assigneeId || '').toLowerCase()) ||
+    (u.username && u.username.toLowerCase() === (task.assigneeId || '').toLowerCase())
+  );
   const creator = users.find(u => u.id === task.createdById);
 
   const handleSaveEdits = () => {

@@ -64,14 +64,7 @@ export const ProjectsPage: React.FC = () => {
     if (tAssignee === uId) return true;
     if (uEmail && tAssignee === uEmail) return true;
     if (uUsername && tAssignee === uUsername) return true;
-
-    const isUserAarav = uId === 'user-marketing-emp' || uEmail.includes('aarav') || uName.includes('aarav') || uUsername === 'aarav';
-    const isTaskAssignedAarav = tAssignee === 'user-marketing-emp' || tAssignee.includes('aarav') || tAssignee === 'aarav.mehta@taskflow.io';
-    if (isUserAarav && isTaskAssignedAarav) return true;
-
-    const isUserSahil = uId === 'user-2' || uEmail.includes('sahil') || uName.includes('sahil') || uUsername === 'sahil';
-    const isTaskAssignedSahil = tAssignee === 'user-2' || tAssignee.includes('sahil') || tAssignee === 'sahilparbale@gmail.com';
-    if (isUserSahil && isTaskAssignedSahil) return true;
+    if (uName && tAssignee === uName) return true;
 
     return false;
   };
@@ -80,9 +73,8 @@ export const ProjectsPage: React.FC = () => {
     const members = Array.isArray(p.members) ? p.members : [];
     if (members.length === 0) return true;
     if (members.includes(u.id)) return true;
-    if (u.id === 'user-marketing-emp' && members.some((m: string) => m === 'user-marketing-emp' || (typeof m === 'string' && m.includes('aarav')))) return true;
-    if (u.id === 'user-marketing-mgr' && members.some((m: string) => m === 'user-marketing-mgr' || (typeof m === 'string' && m.includes('priya')))) return true;
     if (u.email && members.some((m: string) => typeof m === 'string' && m.toLowerCase() === u.email?.toLowerCase())) return true;
+    if (u.name && members.some((m: string) => typeof m === 'string' && m.toLowerCase() === u.name?.toLowerCase())) return true;
     return false;
   };
 

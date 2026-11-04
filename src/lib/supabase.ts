@@ -584,7 +584,7 @@ export async function purgeLegacySeedUsersFromSupabase(): Promise<void> {
   }
 }
 
-// Ensure default users for both Software and Marketing teams exist in Supabase
+// Ensure default manager accounts for both Software and Marketing teams exist in Supabase
 export async function ensureDefaultUsersInSupabase(): Promise<void> {
   const defaultUsers: User[] = [
     {
@@ -601,19 +601,6 @@ export async function ensureDefaultUsersInSupabase(): Promise<void> {
       bio: 'Oversees software engineering, sprint allocation, and technical deliverables.'
     },
     {
-      id: 'user-2',
-      name: 'Sahil Parbale',
-      email: 'sahilparbale@gmail.com',
-      username: 'sahil',
-      password: 'password123',
-      role: 'employee',
-      title: 'Lead Full-Stack Engineer',
-      department: 'Engineering',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      presence: 'online',
-      bio: 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.'
-    },
-    {
       id: 'user-marketing-mgr',
       name: 'Priya Sharma',
       email: 'priya.marketing@taskflow.io',
@@ -625,19 +612,6 @@ export async function ensureDefaultUsersInSupabase(): Promise<void> {
       avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
       presence: 'online',
       bio: 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.'
-    },
-    {
-      id: 'user-marketing-emp',
-      name: 'Aarav Mehta',
-      email: 'aarav.mehta@taskflow.io',
-      username: 'aarav',
-      password: 'marketing123',
-      role: 'employee',
-      title: 'Growth & Content Specialist',
-      department: 'Marketing',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      presence: 'online',
-      bio: 'Executes organic social media, content production, paid search campaigns, and conversion copy.'
     }
   ];
 

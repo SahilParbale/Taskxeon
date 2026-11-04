@@ -161,48 +161,15 @@ CREATE INDEX IF NOT EXISTS idx_projects_department ON public.projects(department
 CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON public.messages(channel_id);
 
 -- ============================================================================
--- Seed Initial Users (Software Development & Marketing Personas)
+-- Seed Foundational Workspace Managers (Software & Marketing)
 -- ============================================================================
 INSERT INTO public.users (id, name, email, role, avatar, title, department, presence, bio, phone)
 VALUES
   ('user-1', 'Shreyas Jadhav', 'shreyasjadhav@gmail.com', 'manager', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', 'Head of Software Development', 'Engineering', 'online', 'Oversees software engineering, sprint allocation, and technical deliverables.', '+1 (555) 234-5678'),
-  ('user-2', 'Sahil Parbale', 'sahilparbale@gmail.com', 'employee', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Lead Full-Stack Engineer', 'Engineering', 'online', 'Core engineering lead driving TaskFlow features, CI/CD, and system architecture.', '+1 (555) 345-6789'),
-  ('user-marketing-mgr', 'Priya Sharma', 'priya.marketing@taskflow.io', 'manager', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80', 'Head of Marketing & Growth', 'Marketing', 'online', 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.', '+1 (555) 456-7890'),
-  ('user-marketing-emp', 'Aarav Mehta', 'aarav.mehta@taskflow.io', 'employee', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Growth & Content Specialist', 'Marketing', 'online', 'Executes organic social media, content production, paid search campaigns, and conversion copy.', '+1 (555) 567-8901')
+  ('user-marketing-mgr', 'Priya Sharma', 'priya.marketing@taskflow.io', 'manager', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80', 'Head of Marketing & Growth', 'Marketing', 'online', 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.', '+1 (555) 456-7890')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   email = EXCLUDED.email,
   role = EXCLUDED.role,
   title = EXCLUDED.title,
-  department = EXCLUDED.department;
-
--- ============================================================================
--- Seed Initial Projects (Software Development & Marketing Campaigns)
--- ============================================================================
-INSERT INTO public.projects (id, name, key, description, health, deadline, members, progress, department, last_updated_by, last_updated_at)
-VALUES
-  ('proj-eng-1', 'Platform Core Sprint', 'DEV', 'Real-time task synchronization, end-to-end encryption, and CI/CD automation.', 'on_track', '2026-12-15', '["user-1", "user-2"]'::jsonb, 65, 'Engineering', 'Shreyas Jadhav', 'Just now'),
-  ('proj-mkt-1', 'Q4 Product Launch Campaign', 'MKT', 'Digital brand awareness, SEO positioning, newsletter launches, and client outreach.', 'on_track', '2026-12-31', '["user-marketing-mgr", "user-marketing-emp"]'::jsonb, 40, 'Marketing', 'Priya Sharma', 'Just now')
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  key = EXCLUDED.key,
-  description = EXCLUDED.description,
-  department = EXCLUDED.department;
-
--- ============================================================================
--- Seed Marketing Client Engagements / Field Leads
--- ============================================================================
-INSERT INTO public.tasks (id, title, description, project_id, assignee_id, created_by_id, priority, status, due_date, tags, department, client_contact, client_phone, client_location, stage_outcome)
-VALUES
-  ('lead-mkt-1', 'Zenith Logistics & Supply', 'Introductory qualification call to understand fleet management requirements.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'high', 'calling', '2026-11-03', '["Calling", "Inbound Lead"]'::jsonb, 'Marketing', 'Sunil Nair (Director)', '+91 98210 11223', 'Andheri East, Mumbai', NULL),
-  ('lead-mkt-2', 'Apex Healthcare Network', 'On-site corporate visit to inspect hospital facility and meet clinical admin team.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'urgent', 'field_visit', '2026-11-04', '["Field Visit", "Enterprise"]'::jsonb, 'Marketing', 'Dr. Rajesh Iyer', '+91 98330 44556', 'BKC Complex, Mumbai', NULL),
-  ('lead-mkt-3', 'Reliance Retail Franchise', 'Live solution demonstration scheduled with procurement department.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'high', 'demo', '2026-11-06', '["Product Demo", "Corporate"]'::jsonb, 'Marketing', 'Pooja Deshmukh (Procurement Lead)', '+91 98700 77889', 'Navi Mumbai Hub', NULL),
-  ('lead-mkt-4', 'Metropolis Diagnostic Labs', 'Contract finalized. 50 user licenses approved following on-site demo.', 'proj-mkt-1', 'user-marketing-emp', 'user-marketing-mgr', 'medium', 'completed', '2026-11-01', '["Closed Won", "Signed Contract"]'::jsonb, 'Marketing', 'Vikram Malhotra', '+91 98190 33445', 'Worli, Mumbai', 'Signed annual contract for 50 enterprise seats.')
-ON CONFLICT (id) DO UPDATE SET
-  title = EXCLUDED.title,
-  client_contact = EXCLUDED.client_contact,
-  client_phone = EXCLUDED.client_phone,
-  client_location = EXCLUDED.client_location,
-  stage_outcome = EXCLUDED.stage_outcome,
-  status = EXCLUDED.status,
   department = EXCLUDED.department;

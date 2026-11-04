@@ -67,13 +67,6 @@ export const MessagesPage: React.FC = () => {
     const firstName = targetUser.name.split(' ')[0].toLowerCase();
     if (firstName && (val === firstName || val.startsWith(firstName))) return true;
 
-    // Resilient fallback for Shreyas and Sahil personas
-    if (targetUser.id === 'user-1' || targetUser.name.toLowerCase().includes('shreyas')) {
-      if (val === 'user-1' || val.includes('shreyas')) return true;
-    }
-    if (targetUser.id === 'user-2' || targetUser.name.toLowerCase().includes('sahil')) {
-      if (val === 'user-2' || val.includes('sahil')) return true;
-    }
     return false;
   };
 

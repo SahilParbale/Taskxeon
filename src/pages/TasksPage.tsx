@@ -78,7 +78,7 @@ export const TasksPage: React.FC = () => {
 
   const todayStr = getTodayDateString();
 
-  // Helper to match assignee to user across id, email, username, and personas
+  // Helper to match assignee to user across id, email, username, and name
   const isTaskAssignedToUser = (
     task: { assigneeId: string },
     user: { id: string; email?: string; name?: string; username?: string }
@@ -94,32 +94,7 @@ export const TasksPage: React.FC = () => {
     if (tAssignee === uId) return true;
     if (uEmail && tAssignee === uEmail) return true;
     if (uUsername && tAssignee === uUsername) return true;
-
-    const isUserAarav =
-      uId === 'user-marketing-emp' ||
-      uEmail.includes('aarav') ||
-      uName.includes('aarav') ||
-      uUsername === 'aarav';
-
-    const isTaskAssignedAarav =
-      tAssignee === 'user-marketing-emp' ||
-      tAssignee.includes('aarav') ||
-      tAssignee === 'aarav.mehta@taskflow.io';
-
-    if (isUserAarav && isTaskAssignedAarav) return true;
-
-    const isUserSahil =
-      uId === 'user-2' ||
-      uEmail.includes('sahil') ||
-      uName.includes('sahil') ||
-      uUsername === 'sahil';
-
-    const isTaskAssignedSahil =
-      tAssignee === 'user-2' ||
-      tAssignee.includes('sahil') ||
-      tAssignee === 'sahilparbale@gmail.com';
-
-    if (isUserSahil && isTaskAssignedSahil) return true;
+    if (uName && tAssignee === uName) return true;
 
     return false;
   };
@@ -127,18 +102,11 @@ export const TasksPage: React.FC = () => {
   const findAssigneeUser = (assigneeId: string) => {
     if (!assigneeId) return undefined;
     const aId = assigneeId.toLowerCase();
-    return (
-      users.find(u =>
-        u.id === assigneeId ||
-        (u.email && u.email.toLowerCase() === aId) ||
-        (u.username && u.username.toLowerCase() === aId)
-      ) ||
-      (aId === 'user-marketing-emp' || aId.includes('aarav')
-        ? users.find(u => u.id === 'user-marketing-emp' || (u.email && u.email.includes('aarav')) || (u.name && u.name.includes('Aarav')))
-        : undefined) ||
-      (aId === 'user-2' || aId.includes('sahil')
-        ? users.find(u => u.id === 'user-2' || (u.email && u.email.includes('sahil')) || (u.name && u.name.includes('Sahil')))
-        : undefined)
+    return users.find(u =>
+      u.id.toLowerCase() === aId ||
+      (u.email && u.email.toLowerCase() === aId) ||
+      (u.username && u.username.toLowerCase() === aId) ||
+      (u.name && u.name.toLowerCase() === aId)
     );
   };
 
