@@ -247,7 +247,7 @@ export async function fetchTasksFromSupabase(): Promise<Task[] | null> {
         row.assignee_id === 'user-marketing-emp' ||
         (row.assignee_id && (row.assignee_id.toLowerCase().includes('aarav') || row.assignee_id.toLowerCase().includes('marketing'))) ||
         row.created_by_id === 'user-marketing-mgr' ||
-        (row.created_by_id && (row.created_by_id.toLowerCase().includes('priya') || row.created_by_id.toLowerCase().includes('marketing'))) ||
+        (row.created_by_id && (row.created_by_id.toLowerCase().includes('hemant') || row.created_by_id.toLowerCase().includes('priya') || row.created_by_id.toLowerCase().includes('marketing'))) ||
         (row.department && row.department.toLowerCase().includes('market')) ||
         hasMarketingTag;
 
@@ -448,9 +448,9 @@ export async function fetchUsersFromSupabase(): Promise<User[] | null> {
     return data.map((row: any): User => {
       const isMarketingUser =
         row.id === 'user-marketing-mgr' ||
-        row.id === 'user-marketing-emp' ||
-        (row.email && (row.email.includes('marketing') || row.email.includes('aarav') || row.email.includes('priya'))) ||
-        (row.name && (row.name.includes('Priya') || row.name.includes('Aarav'))) ||
+        row.id === 'hemantpatil@gmail.com' ||
+        (row.email && (row.email.includes('marketing') || row.email.includes('hemant') || row.email.includes('priya'))) ||
+        (row.name && (row.name.includes('Hemant') || row.name.includes('Priya'))) ||
         (row.title && (row.title.toLowerCase().includes('marketing') || row.title.toLowerCase().includes('growth'))) ||
         (row.department && row.department.toLowerCase().includes('market'));
 
@@ -479,9 +479,9 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
   try {
     const isMarketingUser =
       user.id === 'user-marketing-mgr' ||
-      user.id === 'user-marketing-emp' ||
-      (user.email && (user.email.includes('marketing') || user.email.includes('aarav') || user.email.includes('priya'))) ||
-      (user.name && (user.name.includes('Priya') || user.name.includes('Aarav'))) ||
+      user.id === 'hemantpatil@gmail.com' ||
+      (user.email && (user.email.includes('marketing') || user.email.includes('hemant') || user.email.includes('priya'))) ||
+      (user.name && (user.name.includes('Hemant') || user.name.includes('Priya'))) ||
       (user.department && user.department.toLowerCase().includes('market'));
 
     const dept = isMarketingUser ? 'Marketing' : (user.department || 'Engineering');
@@ -529,8 +529,9 @@ export async function deleteUserFromSupabase(userId: string, email?: string): Pr
     // 1. Reassign any tasks assigned to this user to department manager so foreign keys/references don't block deletion
     const isMarketingUser =
       userId.includes('mkt') ||
-      userId === 'user-marketing-emp' ||
-      (email && (email.includes('market') || email.includes('aarav') || email.includes('priya')));
+      userId === 'user-marketing-mgr' ||
+      userId === 'hemantpatil@gmail.com' ||
+      (email && (email.includes('market') || email.includes('hemant') || email.includes('priya')));
     const fallbackManagerId = isMarketingUser ? 'user-marketing-mgr' : 'user-1';
 
     try {
@@ -602,16 +603,16 @@ export async function ensureDefaultUsersInSupabase(): Promise<void> {
     },
     {
       id: 'user-marketing-mgr',
-      name: 'Priya Sharma',
-      email: 'priya.marketing@taskflow.io',
-      username: 'priyasharma',
-      password: 'marketing123',
+      name: 'Hemant Patil',
+      email: 'hemantpatil@gmail.com',
+      username: 'hemantpatil',
+      password: 'hemant123',
       role: 'manager',
       title: 'Head of Marketing & Growth',
       department: 'Marketing',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
       presence: 'online',
-      bio: 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.'
+      bio: 'Oversees digital marketing, client acquisition, and growth strategy.'
     }
   ];
 

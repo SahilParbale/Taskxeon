@@ -16,16 +16,16 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-marketing-mgr',
-    name: 'Priya Sharma',
-    email: 'priya.marketing@taskflow.io',
-    username: 'priyasharma',
-    password: 'marketing123',
+    name: 'Hemant Patil',
+    email: 'hemantpatil@gmail.com',
+    username: 'hemantpatil',
+    password: 'hemant123',
     role: 'manager',
     title: 'Head of Marketing & Growth',
     department: 'Marketing',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     presence: 'online',
-    bio: 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.'
+    bio: 'Oversees digital marketing, client acquisition, and growth strategy.'
   }
 ];
 

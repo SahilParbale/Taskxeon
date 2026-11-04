@@ -299,10 +299,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Resilient department resolver for any user object (protects against missing DB columns)
   const getUserDepartment = (user?: { id?: string; email?: string; name?: string; username?: string; department?: string }): 'engineering' | 'marketing' => {
     if (!user) return 'engineering';
-    if (user.id === 'user-marketing-mgr' || user.id === 'user-marketing-emp' || (user.id && user.id.includes('mkt'))) return 'marketing';
-    if (user.email && (user.email.includes('marketing') || user.email.includes('aarav') || user.email.includes('priya'))) return 'marketing';
-    if (user.name && (user.name.includes('Priya') || user.name.includes('Aarav'))) return 'marketing';
-    if (user.username && (user.username.includes('priya') || user.username.includes('aarav'))) return 'marketing';
+    if (user.id === 'user-marketing-mgr' || user.id === 'hemantpatil@gmail.com' || (user.id && user.id.includes('mkt'))) return 'marketing';
+    if (user.email && (user.email.includes('marketing') || user.email.includes('hemant') || user.email.includes('priya'))) return 'marketing';
+    if (user.name && (user.name.includes('Hemant') || user.name.includes('Priya'))) return 'marketing';
+    if (user.username && (user.username.includes('hemant') || user.username.includes('priya'))) return 'marketing';
     return normalizeDepartment(user.department);
   };
 
@@ -326,9 +326,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (uName && tAssignee === uName) return true;
 
     // Resilient Manager Persona matching
-    const isUserPriya = uId === 'user-marketing-mgr' || uEmail.includes('priya') || uUsername.includes('priya');
-    const isTaskAssignedPriya = tAssignee === 'user-marketing-mgr' || tAssignee.includes('priya') || tAssignee === 'priya.marketing@taskflow.io';
-    if (isUserPriya && isTaskAssignedPriya) return true;
+    const isUserHemant = uId === 'user-marketing-mgr' || uId === 'hemantpatil@gmail.com' || uEmail.includes('hemant') || uUsername.includes('hemant') || uEmail.includes('priya');
+    const isTaskAssignedHemant = tAssignee === 'user-marketing-mgr' || tAssignee === 'hemantpatil@gmail.com' || tAssignee.includes('hemant') || tAssignee === 'hemantpatil@gmail.com';
+    if (isUserHemant && isTaskAssignedHemant) return true;
 
     const isUserShreyas = uId === 'user-1' || uEmail.includes('shreyas') || uUsername.includes('shreyas');
     const isTaskAssignedShreyas = tAssignee === 'user-1' || tAssignee.includes('shreyas') || tAssignee === 'shreyasjadhav@gmail.com';
@@ -341,7 +341,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const currentUser = useMemo(() => {
     return (
       users.find(u => u.id === currentUserId) ||
-      (currentUserId === 'user-marketing-mgr' ? users.find(u => (u.email && u.email.includes('priya')) || (u.name && u.name.includes('Priya'))) : undefined) ||
+      (currentUserId === 'user-marketing-mgr' || currentUserId === 'hemantpatil@gmail.com'
+        ? users.find(u => (u.email && u.email.includes('hemant')) || (u.name && u.name.includes('Hemant')) || (u.email && u.email.includes('priya')) || u.id === 'user-marketing-mgr')
+        : undefined) ||
       (currentUserId === 'user-1' ? users.find(u => (u.email && u.email.includes('shreyas')) || (u.name && u.name.includes('Shreyas'))) : undefined) ||
       users[0] ||
       INITIAL_USERS[0]
@@ -365,8 +367,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         (p.id && p.id.includes('mkt')) ||
         p.key === 'MKT' ||
         (p.department && normalizeDepartment(p.department) === 'marketing') ||
-        (Array.isArray(p.members) && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || (typeof m === 'string' && (m.includes('priya') || m.includes('aarav'))))) ||
-        (p.lastUpdatedBy && (p.lastUpdatedBy.includes('Priya') || p.lastUpdatedBy.includes('Aarav')));
+        (Array.isArray(p.members) && p.members.some(m => m === 'user-marketing-mgr' || m === 'hemantpatil@gmail.com' || (typeof m === 'string' && (m.includes('hemant') || m.includes('priya'))))) ||
+        (p.lastUpdatedBy && (p.lastUpdatedBy.includes('Hemant') || p.lastUpdatedBy.includes('Priya')));
 
       if (currentDept === 'marketing') return isMkt;
       return !isMkt;
@@ -382,7 +384,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             (p.id && p.id.includes('mkt')) ||
             p.key === 'MKT' ||
             (p.department && normalizeDepartment(p.department) === 'marketing') ||
-            (Array.isArray(p.members) && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || (typeof m === 'string' && (m.includes('priya') || m.includes('aarav')))))
+            (Array.isArray(p.members) && p.members.some(m => m === 'user-marketing-mgr' || m === 'hemantpatil@gmail.com' || (typeof m === 'string' && (m.includes('hemant') || m.includes('priya')))))
         )
         .map(p => p.id)
     );
@@ -411,18 +413,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const assigneeIsMarketing =
         (assigneeUser && getUserDepartment(assigneeUser) === 'marketing') ||
-        tAssignee === 'user-marketing-emp' ||
         tAssignee === 'user-marketing-mgr' ||
-        tAssignee.includes('aarav') ||
+        tAssignee === 'hemantpatil@gmail.com' ||
+        tAssignee.includes('hemant') ||
         tAssignee.includes('priya') ||
         tAssignee.includes('marketing');
 
       const creatorIsMarketing =
         (creatorUser && getUserDepartment(creatorUser) === 'marketing') ||
         tCreator === 'user-marketing-mgr' ||
-        tCreator === 'user-marketing-emp' ||
+        tCreator === 'hemantpatil@gmail.com' ||
+        tCreator.includes('hemant') ||
         tCreator.includes('priya') ||
-        tCreator.includes('aarav') ||
         tCreator.includes('marketing');
 
       const hasMarketingTag = (t.tags || []).some((tg: string) => {
@@ -1123,7 +1125,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       targetUser.role === 'manager' ||
       targetUser.id === 'user-1' ||
       targetUser.id === 'user-marketing-mgr' ||
+      targetUser.id === 'hemantpatil@gmail.com' ||
       targetUser.email === 'shreyasjadhav@gmail.com' ||
+      targetUser.email === 'hemantpatil@gmail.com' ||
       targetUser.email === 'priya.marketing@taskflow.io'
     ) {
       addToast('Cannot Remove Manager', 'Manager accounts cannot be deleted.', 'warning');
@@ -1671,6 +1675,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         nameLower === rawInput ||
         emailPrefix === rawInput ||
         ((rawInput === 'shreyasjadhav@gmail.com' || rawInput === 'shreyasjadhav' || rawInput === 'shreyas') && u.id === 'user-1') ||
+        ((rawInput === 'hemantpatil@gmail.com' || rawInput === 'hemantpatil' || rawInput === 'hemant') && (u.id === 'user-marketing-mgr' || u.id === 'hemantpatil@gmail.com' || (u.email && u.email.includes('hemant')))) ||
         ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || (u.email && u.email.includes('priya'))))
       );
     });
@@ -1678,7 +1683,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!matchedUser) {
       return {
         success: false,
-        error: `No account found for "${usernameOrEmail}". Sign in as Shreyas Jadhav (shreyasjadhav@gmail.com) for Software or Priya Sharma (priya.marketing@taskflow.io) for Marketing.`
+        error: `No account found for "${usernameOrEmail}". Sign in as Shreyas Jadhav (shreyasjadhav@gmail.com) for Software or Hemant Patil (hemantpatil@gmail.com) for Marketing.`
       };
     }
 
@@ -1691,14 +1696,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Check password
     const expectedPassword = matchedUser.password || (
       matchedUser.id === 'user-1' ? 'shreyas123' :
-      matchedUser.id === 'user-marketing-mgr' ? 'marketing123' :
+      matchedUser.id === 'user-marketing-mgr' || matchedUser.id === 'hemantpatil@gmail.com' ? 'hemant123' :
       'password123'
     );
     const isPasswordValid =
       password === expectedPassword ||
       (matchedUser.id === 'user-1' && (password === 'shreyas123' || password === 'password123')) ||
-      (matchedUser.id === 'user-marketing-mgr' && (password === 'marketing123' || password === 'password123')) ||
-      (matchedUser.department && matchedUser.department.toLowerCase().includes('market') && password === 'marketing123') ||
+      ((matchedUser.id === 'user-marketing-mgr' || matchedUser.id === 'hemantpatil@gmail.com') && (password === 'hemant123' || password === 'marketing123' || password === 'password123')) ||
+      (matchedUser.department && matchedUser.department.toLowerCase().includes('market') && (password === 'hemant123' || password === 'marketing123')) ||
       (matchedUser.password && password === matchedUser.password) ||
       password === 'password123';
 
@@ -1706,7 +1711,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const defaultPwdHint = matchedUser.id === 'user-1'
         ? '"shreyas123"'
         : (matchedUser.department && matchedUser.department.toLowerCase().includes('market'))
-        ? '"marketing123"'
+        ? '"hemant123"'
         : '"password123"';
       return {
         success: false,

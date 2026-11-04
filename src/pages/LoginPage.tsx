@@ -312,10 +312,10 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   disabled={isLoading}
-                  onClick={() => handleQuickLogin('priya.marketing@taskflow.io', 'marketing123')}
+                  onClick={() => handleQuickLogin('hemantpatil@gmail.com', 'hemant123')}
                   className="p-2.5 rounded-lg border border-teal-200 bg-teal-50/70 hover:bg-teal-100 text-slate-900 text-left transition-colors flex flex-col cursor-pointer disabled:opacity-50 shadow-2xs"
                 >
-                  <span className="font-bold text-xs text-slate-900">Priya Sharma</span>
+                  <span className="font-bold text-xs text-slate-900">Hemant Patil</span>
                   <span className="text-[10px] text-teal-800 font-semibold">Marketing Manager</span>
                 </button>
               </div>
@@ -380,14 +380,14 @@ export const LoginPage: React.FC = () => {
                 <div className="space-y-1.5 mt-1.5">
                   <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-slate-900 text-xs">Priya Sharma</div>
-                      <div className="text-[10px] text-slate-500 font-mono">marketing123</div>
+                      <div className="font-bold text-slate-900 text-xs">Hemant Patil</div>
+                      <div className="text-[10px] text-slate-500 font-mono">hemant123</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        setUsernameOrEmail('priya.marketing@taskflow.io');
-                        setPassword('marketing123');
+                        setUsernameOrEmail('hemantpatil@gmail.com');
+                        setPassword('hemant123');
                         setShowForgotModal(false);
                       }}
                       className="px-2 py-0.5 rounded bg-teal-700 hover:bg-teal-800 text-white font-semibold text-[11px] cursor-pointer"

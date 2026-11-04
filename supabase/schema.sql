@@ -163,13 +163,15 @@ CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON public.messages(channel_id
 -- ============================================================================
 -- Seed Foundational Workspace Managers (Software & Marketing)
 -- ============================================================================
-INSERT INTO public.users (id, name, email, role, avatar, title, department, presence, bio, phone)
+INSERT INTO public.users (id, name, email, username, password, role, avatar, title, department, presence, bio, phone)
 VALUES
-  ('user-1', 'Shreyas Jadhav', 'shreyasjadhav@gmail.com', 'manager', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', 'Head of Software Development', 'Engineering', 'online', 'Oversees software engineering, sprint allocation, and technical deliverables.', '+1 (555) 234-5678'),
-  ('user-marketing-mgr', 'Priya Sharma', 'priya.marketing@taskflow.io', 'manager', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80', 'Head of Marketing & Growth', 'Marketing', 'online', 'Leads digital marketing, brand campaigns, SEO strategy, and customer acquisition.', '+1 (555) 456-7890')
+  ('user-1', 'Shreyas Jadhav', 'shreyasjadhav@gmail.com', 'shreyasjadhav', 'shreyas123', 'manager', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', 'Head of Software Development', 'Engineering', 'online', 'Oversees software engineering, sprint allocation, and technical deliverables.', '+1 (555) 234-5678'),
+  ('user-marketing-mgr', 'Hemant Patil', 'hemantpatil@gmail.com', 'hemantpatil', 'hemant123', 'manager', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Head of Marketing & Growth', 'Marketing', 'online', 'Leads digital marketing, commercial growth, client acquisition, and enterprise sales.', '+1 (555) 456-7890')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   email = EXCLUDED.email,
+  username = EXCLUDED.username,
+  password = EXCLUDED.password,
   role = EXCLUDED.role,
   title = EXCLUDED.title,
   department = EXCLUDED.department;
