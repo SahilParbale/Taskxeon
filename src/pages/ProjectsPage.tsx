@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ProjectHealth } from '../types';
+import { ProjectHealth, Project } from '../types';
 import { PresenceBadge } from '../components/common/PresenceBadge';
 import { StatusBadge } from '../components/common/StatusBadge';
 import {
@@ -77,11 +77,12 @@ export const ProjectsPage: React.FC = () => {
   };
 
   const isUserProjectMember = (p: Project, u: { id: string; email?: string; name?: string }) => {
-    if (!p.members || p.members.length === 0) return true;
-    if (p.members.includes(u.id)) return true;
-    if (u.id === 'user-marketing-emp' && p.members.some(m => m === 'user-marketing-emp' || m.includes('aarav'))) return true;
-    if (u.id === 'user-marketing-mgr' && p.members.some(m => m === 'user-marketing-mgr' || m.includes('priya'))) return true;
-    if (u.email && p.members.some(m => m.toLowerCase() === u.email?.toLowerCase())) return true;
+    const members = Array.isArray(p.members) ? p.members : [];
+    if (members.length === 0) return true;
+    if (members.includes(u.id)) return true;
+    if (u.id === 'user-marketing-emp' && members.some((m: string) => m === 'user-marketing-emp' || (typeof m === 'string' && m.includes('aarav')))) return true;
+    if (u.id === 'user-marketing-mgr' && members.some((m: string) => m === 'user-marketing-mgr' || (typeof m === 'string' && m.includes('priya')))) return true;
+    if (u.email && members.some((m: string) => typeof m === 'string' && m.toLowerCase() === u.email?.toLowerCase())) return true;
     return false;
   };
 
@@ -140,7 +141,7 @@ export const ProjectsPage: React.FC = () => {
 
   // Detailed Project View
   if (selectedProject) {
-    const projectMembers = users.filter(u => selectedProject.members.includes(u.id));
+    const projectMembers = users.filter(u => Array.isArray(selectedProject.members) && selectedProject.members.includes(u.id));
     // Employees only see their own assigned tasks for the project; managers see all project tasks
     const projectTasks = tasks.filter(
       t => t.projectId === selectedProject.id && (currentUser.role === 'manager' || isTaskAssignedToUser(t, currentUser))
@@ -912,14 +913,15 @@ export const ProjectsPage: React.FC = () => {
                   Assign or remove team members. Only checked contributors can view this project:
                 </p>
                 {users.map(u => {
-                  const isAssigned = selectedProject.members.includes(u.id);
+                  const currMembers = Array.isArray(selectedProject.members) ? selectedProject.members : [];
+                  const isAssigned = currMembers.includes(u.id);
                   return (
                     <div
                       key={u.id}
                       onClick={() => {
                         const newMembers = isAssigned
-                          ? selectedProject.members.filter(id => id !== u.id)
-                          : [...selectedProject.members, u.id];
+                          ? currMembers.filter(id => id !== u.id)
+                          : [...currMembers, u.id];
                         updateProjectMembers(selectedProject.id, newMembers);
                       }}
                       className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all ${
@@ -1043,7 +1045,7 @@ export const ProjectsPage: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Assigned to Me ({projects.filter(p => p.members.includes(currentUser.id)).length})
+                Assigned to Me ({projects.filter(p => Array.isArray(p.members) && p.members.includes(currentUser.id)).length})
               </button>
             </div>
           )}
@@ -1119,7 +1121,7 @@ export const ProjectsPage: React.FC = () => {
             isMarketing ||
             (project.department && project.department.toLowerCase().includes('market')) ||
             project.id.includes('mkt');
-          const projectMembers = users.filter(u => project.members.includes(u.id));
+          const projectMembers = users.filter(u => Array.isArray(project.members) && project.members.includes(u.id));
           const projectTasks = tasks.filter(t => t.projectId === project.id);
           const completedTasksCount = projectTasks.filter(t => t.status === 'completed').length;
 

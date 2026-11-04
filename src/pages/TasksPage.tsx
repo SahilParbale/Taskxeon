@@ -134,10 +134,10 @@ export const TasksPage: React.FC = () => {
         (u.username && u.username.toLowerCase() === aId)
       ) ||
       (aId === 'user-marketing-emp' || aId.includes('aarav')
-        ? users.find(u => u.id === 'user-marketing-emp' || u.email.includes('aarav') || u.name.includes('Aarav'))
+        ? users.find(u => u.id === 'user-marketing-emp' || (u.email && u.email.includes('aarav')) || (u.name && u.name.includes('Aarav')))
         : undefined) ||
       (aId === 'user-2' || aId.includes('sahil')
-        ? users.find(u => u.id === 'user-2' || u.email.includes('sahil') || u.name.includes('Sahil'))
+        ? users.find(u => u.id === 'user-2' || (u.email && u.email.includes('sahil')) || (u.name && u.name.includes('Sahil')))
         : undefined)
     );
   };
@@ -443,7 +443,7 @@ export const TasksPage: React.FC = () => {
               options={[
                 { value: 'all', label: isMarketing ? 'All Products' : 'All Projects' },
                 ...projects
-                  .filter(p => currentUser.role === 'manager' || p.members.includes(currentUser.id))
+                  .filter(p => currentUser.role === 'manager' || (Array.isArray(p.members) && p.members.includes(currentUser.id)))
                   .map(p => ({
                     value: p.id,
                     label: `[${p.key}] ${p.name}`

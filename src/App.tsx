@@ -18,6 +18,7 @@ import { ToastContainer } from './components/common/Toast';
 import { InstallAppModal, MobileFloatingInstallPrompt } from './components/common/InstallAppModal';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { NotificationDropdown } from './components/common/NotificationDropdown';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Layers, Search, Menu } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
@@ -142,9 +143,11 @@ const MainLayout: React.FC = () => {
 
 export function App() {
   return (
-    <AppProvider>
-      <MainLayout />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <MainLayout />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 

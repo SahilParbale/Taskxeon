@@ -307,7 +307,6 @@ export const TeamPage: React.FC = () => {
             const activeTasks = memberTasks.filter(t => t.status !== 'completed');
             const completedCount = memberTasks.filter(t => t.status === 'completed').length;
             const isCurrent = member.id === currentUser.id;
-            const isDeleting = confirmDeleteId === member.id;
 
             return (
               <div

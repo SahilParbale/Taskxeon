@@ -1,4 +1,4 @@
-import { Project, Task, User, ActivityLog, Notification, ChatMessage, PresenceStatus } from '../types';
+import { Project, Task, User, ActivityLog, Notification, ChatMessage, PresenceStatus, TaskStatus } from '../types';
 import { encryptTextMessage, decryptTextMessage } from './encryption';
 
 const envUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
@@ -480,11 +480,8 @@ export async function upsertUserToSupabase(user: User): Promise<boolean> {
     const isMarketingUser =
       user.id === 'user-marketing-mgr' ||
       user.id === 'user-marketing-emp' ||
-      user.email.includes('marketing') ||
-      user.email.includes('aarav') ||
-      user.email.includes('priya') ||
-      user.name.includes('Priya') ||
-      user.name.includes('Aarav') ||
+      (user.email && (user.email.includes('marketing') || user.email.includes('aarav') || user.email.includes('priya'))) ||
+      (user.name && (user.name.includes('Priya') || user.name.includes('Aarav'))) ||
       (user.department && user.department.toLowerCase().includes('market'));
 
     const dept = isMarketingUser ? 'Marketing' : (user.department || 'Engineering');

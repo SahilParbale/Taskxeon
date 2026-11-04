@@ -124,7 +124,7 @@ export const Sidebar: React.FC<{ onOpenInstallModal?: () => void }> = () => {
         : (currentUser.role === 'employee' ? 'My Projects' : 'Projects'),
       icon: <FolderKanban className="w-4 h-4" />,
       badge: (currentUser.role === 'employee'
-        ? projects.filter(p => p.members.includes(currentUser.id)).length
+        ? projects.filter(p => Array.isArray(p.members) && p.members.includes(currentUser.id)).length
         : projects.length)
     },
     {

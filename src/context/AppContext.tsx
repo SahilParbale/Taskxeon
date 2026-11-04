@@ -391,10 +391,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const currentUser = useMemo(() => {
     return (
       users.find(u => u.id === currentUserId) ||
-      (currentUserId === 'user-marketing-mgr' ? users.find(u => u.email.includes('priya') || u.name.includes('Priya')) : undefined) ||
-      (currentUserId === 'user-marketing-emp' ? users.find(u => u.email.includes('aarav') || u.name.includes('Aarav')) : undefined) ||
-      (currentUserId === 'user-2' ? users.find(u => u.name.includes('Sahil') || u.email.includes('sahil')) : undefined) ||
-      users[0]
+      (currentUserId === 'user-marketing-mgr' ? users.find(u => (u.email && u.email.includes('priya')) || (u.name && u.name.includes('Priya'))) : undefined) ||
+      (currentUserId === 'user-marketing-emp' ? users.find(u => (u.email && u.email.includes('aarav')) || (u.name && u.name.includes('Aarav'))) : undefined) ||
+      (currentUserId === 'user-2' ? users.find(u => (u.name && u.name.includes('Sahil')) || (u.email && u.email.includes('sahil'))) : undefined) ||
+      users[0] ||
+      INITIAL_USERS[0]
     );
   }, [users, currentUserId]);
 
@@ -412,10 +413,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return projects.filter(p => {
       const isMkt =
         p.id === 'proj-mkt-1' ||
-        p.id.includes('mkt') ||
+        (p.id && p.id.includes('mkt')) ||
         p.key === 'MKT' ||
         (p.department && normalizeDepartment(p.department) === 'marketing') ||
-        (p.members && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || m.includes('priya') || m.includes('aarav'))) ||
+        (Array.isArray(p.members) && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || (typeof m === 'string' && (m.includes('priya') || m.includes('aarav'))))) ||
         (p.lastUpdatedBy && (p.lastUpdatedBy.includes('Priya') || p.lastUpdatedBy.includes('Aarav')));
 
       if (currentDept === 'marketing') return isMkt;
@@ -429,10 +430,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .filter(
           p =>
             p.id === 'proj-mkt-1' ||
-            p.id.includes('mkt') ||
+            (p.id && p.id.includes('mkt')) ||
             p.key === 'MKT' ||
             (p.department && normalizeDepartment(p.department) === 'marketing') ||
-            (p.members && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || m.includes('priya') || m.includes('aarav')))
+            (Array.isArray(p.members) && p.members.some(m => m === 'user-marketing-mgr' || m === 'user-marketing-emp' || (typeof m === 'string' && (m.includes('priya') || m.includes('aarav')))))
         )
         .map(p => p.id)
     );
@@ -1348,10 +1349,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setProjects(prev =>
         prev.map(p => {
           if (p.id === data.projectId) {
-            const hasMember = p.members.includes(data.assigneeId);
+            const pMembers = Array.isArray(p.members) ? p.members : [];
+            const hasMember = pMembers.includes(data.assigneeId);
             const updatedP = {
               ...p,
-              members: hasMember ? p.members : [...p.members, data.assigneeId],
+              members: hasMember ? pMembers : [...pMembers, data.assigneeId],
               lastUpdatedBy: currentUser.name,
               lastUpdatedAt: 'Just now'
             };
@@ -1488,7 +1490,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       todo: 'moved task to To Do',
       in_progress: 'started working on',
       blocked: 'flagged blocker on',
-      completed: 'completed task'
+      completed: 'completed task',
+      calling: 'logged client outreach call on',
+      field_visit: 'scheduled on-site field visit for',
+      demo: 'initiated product demonstration for'
     };
     const newAct: ActivityLog = {
       id: `act-${Date.now()}`,
@@ -1517,7 +1522,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ...updates,
       completedAt: updates.status === 'completed'
         ? (oldTask.completedAt || new Date().toISOString())
-        : (updates.status && updates.status !== 'completed' ? undefined : (updates.completedAt !== undefined ? updates.completedAt : oldTask.completedAt))
+        : (updates.status ? undefined : (updates.completedAt !== undefined ? updates.completedAt : oldTask.completedAt))
     };
     setTasks(prev => prev.map(t => (t.id === taskId ? updatedTask : t)));
     upsertTaskToSupabase(updatedTask);
@@ -1741,9 +1746,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         nameLower === rawInput ||
         emailPrefix === rawInput ||
         ((rawInput === 'shreyasjadhav@gmail.com' || rawInput === 'shreyasjadhav' || rawInput === 'shreyas') && u.id === 'user-1') ||
-        ((rawInput === 'sahilparbale@gmail.com' || rawInput === 'sahil' || rawInput === 'sahilparbale') && (u.id === 'user-2' || u.name.includes('Sahil'))) ||
-        ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || u.name.includes('Priya') || u.email.includes('priya'))) ||
-        ((rawInput === 'aarav.mehta@taskflow.io' || rawInput === 'aarav') && (u.id === 'user-marketing-emp' || u.name.includes('Aarav') || u.email.includes('aarav')))
+        ((rawInput === 'sahilparbale@gmail.com' || rawInput === 'sahil' || rawInput === 'sahilparbale') && (u.id === 'user-2' || (u.name && u.name.includes('Sahil')))) ||
+        ((rawInput === 'priya.marketing@taskflow.io' || rawInput === 'priyasharma' || rawInput === 'priya') && (u.id === 'user-marketing-mgr' || (u.name && u.name.includes('Priya')) || (u.email && u.email.includes('priya')))) ||
+        ((rawInput === 'aarav.mehta@taskflow.io' || rawInput === 'aarav') && (u.id === 'user-marketing-emp' || (u.name && u.name.includes('Aarav')) || (u.email && u.email.includes('aarav'))))
       );
     });
 
@@ -1770,14 +1775,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       password === expectedPassword ||
       (matchedUser.id === 'user-1' && (password === 'shreyas123' || password === 'password123')) ||
       (matchedUser.id === 'user-2' && (password === 'sahil123' || password === 'password123')) ||
-      (matchedUser.department.toLowerCase().includes('market') && (password === 'marketing123' || password === 'password123')) ||
+      (matchedUser.department && matchedUser.department.toLowerCase().includes('market') && (password === 'marketing123' || password === 'password123')) ||
       password === 'password123' ||
       password === 'taskflow123';
 
     if (!isPasswordValid) {
       const defaultPwdHint = matchedUser.id === 'user-1'
         ? '"shreyas123"'
-        : matchedUser.department.toLowerCase().includes('market')
+        : (matchedUser.department && matchedUser.department.toLowerCase().includes('market'))
         ? '"marketing123"'
         : '"password123"';
       return {

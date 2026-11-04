@@ -577,10 +577,10 @@ export const Dashboard: React.FC = () => {
                         (u.username && u.username.toLowerCase() === (t.assigneeId || '').toLowerCase())
                       ) ||
                       (t.assigneeId === 'user-marketing-emp' || (t.assigneeId || '').toLowerCase().includes('aarav')
-                        ? users.find(u => u.id === 'user-marketing-emp' || u.email.includes('aarav') || u.name.includes('Aarav'))
+                        ? users.find(u => u.id === 'user-marketing-emp' || (u.email && u.email.includes('aarav')) || (u.name && u.name.includes('Aarav')))
                         : undefined) ||
                       (t.assigneeId === 'user-2' || (t.assigneeId || '').toLowerCase().includes('sahil')
-                        ? users.find(u => u.id === 'user-2' || u.email.includes('sahil') || u.name.includes('Sahil'))
+                        ? users.find(u => u.id === 'user-2' || (u.email && u.email.includes('sahil')) || (u.name && u.name.includes('Sahil')))
                         : undefined);
                     const isPast = isPastDate(t.dueDate);
                     return (
